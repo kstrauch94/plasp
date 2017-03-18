@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 
-PLASP         = "plasp"
+PLASP         = "./plasp"
 PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
 PLANNER       = PLASP_DIR + "encodings/planner/planner.py"
 BASIC         = PLASP_DIR + "encodings/planner/basic.lp"
@@ -43,8 +43,10 @@ TEST_ACT_T    = os.path.join(TEST_FILES,"block_actions_t.lp")
 
 # Other systems
 CLINGO      = "clingo"
-FAST_D      = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --alias seq-sat-lama-2011"
-FAST_D_TR   = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --translate"
+#FAST_D      = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --alias seq-sat-lama-2011"
+#FAST_D_TR   = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --translate"
+FAST_D      = "/home/klaus/bin/Fast-Downward/fast-downward.py --alias seq-sat-lama-2011"
+FAST_D_TR   = "/home/klaus/bin/Fast-Downward/fast-downward.py --translate"
 SAS_OUTPUT  = "output.sas"
 M           = "M"
 MP          = "Mp"

@@ -1,0 +1,13 @@
+runplanner.py
+
+- PLASP = ./plasp line 6
+- fast downward directory line 20, 21 -> 22, 23
+
+planner.py
+
+- store model and actions in on_model callback line 350, 351
+- checker class line 439
+- Check the model line 532+
+
+strips_incremental.lp
+- commented line 88
