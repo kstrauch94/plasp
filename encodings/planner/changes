@@ -7,7 +7,8 @@ planner.py
 
 - store model and actions in on_model callback line 350, 351
 - checker class line 439
-- Check the model line 532+
+- check the model line 532+
+- add constraint for the actions line 425 + line 539
 
 strips_incremental.lp
 - commented line 88
