@@ -346,7 +346,9 @@ class Solver:
             log("Answer: 1\n" + str(m),PRINT)
         else:
             log("ANSWER\n" + " ".join([str(x)+"." for x in m.symbols(shown=True)]),FORCE_PRINT)
-
+        
+        self.actions = " ".join([str(x)+"." for x in m.symbols(shown=True)])
+        self.model = " ".join([str(x)+"." for x in m.symbols(atoms=True)])
 
     def __verbose_start(self):
         self.__time0 = clock()
@@ -420,6 +422,48 @@ class Solver:
         # return
         return self.__result
 
+    def add_actions_constraint(self, actions):
+        constraint = ":- " + actions[:-1].replace(".", ",") + "."
+        #print "new constraint: ", constraint
+        
+        self.__ctl.add(BASE, [], constraint)
+        self.__ctl.ground([(BASE, [])])
+
+#
+# CHECKER
+#
+
+PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
+POSTPROCESS   = PLASP_DIR + "encodings/strips/postprocess.lp"
+
+class Checker(object):
+    
+    checks_performed = 0
+    
+    def __init__(self):
+        self.hasModel = False
+    
+    @staticmethod
+    def check(model):
+        Checker.checks_performed += 1
+        
+        checker = Checker()
+
+        control = clingo.Control()
+        control.load(POSTPROCESS)
+        control.add(BASE, [], model)
+        
+        checker = Checker() 
+        return checker.solve(control)
+
+    def solve(self, control):
+        control.ground([("base", [])])
+        control.solve(self.on_model)
+        return self.hasModel
+        
+    def on_model(self, model):
+        
+        self.hasModel = True
 
 #
 # PLANNER
@@ -449,6 +493,7 @@ class Planner:
 
         # solver
         solver = Solver(ctl,options)
+        # checker
 
         # scheduler
         if sum([1 for i in ['A','B','C'] if options[i] is not None])>1: # check argument error
@@ -484,9 +529,16 @@ class Planner:
             result = solver.solve(length)
             if result is not None and length > max_length: max_length = length
             if result is not None and result.satisfiable:
-                log("SATISFIABLE",PRINT)
-                sol_length = length
-                break
+                if Checker.check(solver.model):
+                    print "check successful"  
+                    print "Checks performed: ", Checker.checks_performed             
+                    log("SATISFIABLE",PRINT)
+                    sol_length = length
+                    break
+                print "check unsuccessful"
+                solver.add_actions_constraint(solver.actions)
+                result = None
+
             if verbose: log("Iteration Time:\t {:.2f}s\n".format(clock()-time0))
             #log("\n" + clingo_stats.Stats().summary(ctl),PRINT)
             #if options['stats']:
