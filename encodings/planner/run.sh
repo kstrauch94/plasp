@@ -16,6 +16,14 @@ INSTANCE8=../../instances/PDDL/ipc-2006-tpp-propositional/problem-04.pddl
 
 INSTANCE9=../../instances/PDDL/ipc-2002-driver-log-strips/problem-03.pddl
 
+INSTANCE10=../../../instances-easy/ipc-2002/domains/depots-strips-automatic/instances/instance-7.pddl
 
-python -B runplanner.py $INSTANCE9 --translate --parallel=0
+INSTANCE11=../../../instances-hard/ipc-2002/domains/depots-strips-automatic/instances/instance-13.pddl
+
+INSTANCE12=../../../instances-easy/ipc-2002/domains/driverlog-strips-automatic/instances/instance-14.pddl
+
+
+
+python -B runplanner.py $INSTANCE12 --translate --parallel=0
+#python -B runplanner.py $INSTANCE12 --translate --parallel=0 --heuristic=Domain heuristic.lp
 

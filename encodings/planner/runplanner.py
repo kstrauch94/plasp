@@ -144,6 +144,7 @@ def run():
         domain = options['domain']
     else:
         domain = os.path.dirname(os.path.realpath(instance)) + "/domain.pddl"
+        print domain
         if not os.path.isfile(domain):
             domain = os.path.dirname(os.path.realpath(instance)) + "/domain_" + os.path.basename(instance)
         if not os.path.isfile(domain):
