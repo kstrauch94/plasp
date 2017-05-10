@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 
-PLASP         = "./plasp"
+PLASP         = "plasp"
 PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
 PLANNER       = PLASP_DIR + "encodings/planner/planner.py"
 BASIC         = PLASP_DIR + "encodings/planner/basic.lp"
