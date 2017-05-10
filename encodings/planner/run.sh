@@ -24,6 +24,6 @@ INSTANCE12=../../../instances-easy/ipc-2002/domains/driverlog-strips-automatic/i
 
 
 
-python -B runplanner.py $INSTANCE12 --translate --parallel=0
+python -B runplanner.py $INSTANCE1 --translate --parallel=0
 #python -B runplanner.py $INSTANCE12 --translate --parallel=0 --heuristic=Domain heuristic.lp
 

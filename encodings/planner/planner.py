@@ -434,7 +434,6 @@ class Solver:
 
     def add_actions_constraint(self, actions):
         constraint = ":- " + actions[:-1].replace(".", ",") + "."
-        print "new constraint: ", constraint
         self.actions_constraint = constraint
 
 #
@@ -471,7 +470,7 @@ class Checker(object):
 
     def solve(self, control):
         control.ground([("base", [])])
-        control.solve(self.on_model)
+        control.solve(on_model=self.on_model)
         return self.hasModel
         
     def on_model(self, model):
@@ -646,7 +645,7 @@ class Checker2(object):
 
 class SolveResult(object):
 
-    def __init__(self, sat=False, unsat=False, unknown=False):
+    def __init__(self, sat=None, unsat=None, unknown=None):
         self.satisfiable = sat
         self.unsatisfiable = unsat
         self.unknown = unknown
@@ -716,14 +715,15 @@ class Planner:
             result = solver.solve(length)
             if result is not None and length > max_length: max_length = length
             if result is not None and result.satisfiable:
-                check1 = True#Checker.check(solver.model)
+                check1 = checker2.check(solver.model_as_atoms, length)#Checker.check(solver.model)
                 #check2 = checker2.check(solver.model_as_atoms, length)
                 #print check1, check2
                 if check1:# and check2:
                     print "check successful"
                     print "Checks performed: ", Checker.checks_performed
+                    print "Checks performed: ", checker2.checks_performed
                     print "Checking time: ", Checker.time
-                    #checker2.print_stats()
+                    checker2.print_stats()
                     log("SATISFIABLE",PRINT)
                     sol_length = length
                     break
@@ -746,6 +746,7 @@ class Planner:
             log("Max. Length  : {} steps".format(max_length),PRINT)
             if sol_length: log("Sol. Length  : {} steps\n".format(sol_length),PRINT)
             else: log("",PRINT)
+
 
 
 
