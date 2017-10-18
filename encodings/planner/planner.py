@@ -659,7 +659,8 @@ class Checker(object):
         Checker.checks_performed += 1
         starttime = time()
         
-        checker = Checker()
+        with open("model.lp", "w") as m:
+            m.writelines(model)
 
         control = clingo.Control()
         control.load(POSTPROCESS)
@@ -949,21 +950,24 @@ class Planner:
 =======
             if result is not None and length > max_length: max_length = length
             if result is not None and result.satisfiable:
-                check1 = checker2.check(solver.model_as_atoms, length)#Checker.check(solver.model)
+                check1 = Checker.check(solver.model)
                 #check2 = checker2.check(solver.model_as_atoms, length)
                 #print check1, check2
                 if check1:# and check2:
                     print "check successful"
                     print "Checks performed: ", Checker.checks_performed
-                    print "Checks performed: ", checker2.checks_performed
+                    #print "Checks performed: ", checker2.checks_performed
                     print "Checking time: ", Checker.time
-                    checker2.print_stats()
+                    #checker2.print_stats()
                     log("SATISFIABLE",PRINT)
                     sol_length = length
                     break
                 print "check unsuccessful"
-                solver.add_actions_constraint(solver.actions)
+                #solver.add_actions_constraint(solver.actions)
                 result = SolveResult(unknown=True)
+                
+                # to stop after first check uncomment the break!
+                #break
 
 >>>>>>> Add sequential checker and fix the value of result after failed check
             if verbose: log("Iteration Time:\t {:.2f}s\n".format(clock()-time0))
