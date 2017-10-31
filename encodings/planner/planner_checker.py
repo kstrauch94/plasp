@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 
 #
@@ -13,6 +13,8 @@ from time import clock
 from time import time
 import clingo_stats
 import os
+
+import ClingoGrounder
 
 # 
 # DEFINES
@@ -297,9 +299,12 @@ class C_Scheduler(Scheduler):
                 self.__length = 1
             self.__first  = False
 
-        # NO_MEM: check if all nomems, append and pop
-        elif result == NO_MEM:
-            self.__nomems.add(self.__runs[0])
+        # NONE: check if all Nones, append and pop
+        elif result != NO_MEM:
+            self.__nones.add(self.__runs[0])
+            if len(self.__nones) == len(self.__runs): 
+                return None
+
             self.__runs.append(self.__runs[0])
             self.__runs = self.__runs[1:]
             if len(self.__nomems) == len(self.__runs):
@@ -356,6 +361,10 @@ FORBID_ACTIONS_PROGRAM = """
 """
 FORCE_ACTIONS_PROGRAM = """
 #program step(t).
+:- not occurs(A,t):action(A); not skip(t). % some action
+"""
+FORCE_ACTIONS_PROGRAM_OLD = """
+#program step(t).
 :- not occurs(_,t), not skip(t). % some action
 """
 BLOCK_BASE = "block_base"   # block_base
@@ -371,11 +380,10 @@ _test(A,B) :- #false, _test(A,B).
 
 class Tester:
 
-    def __init__(self, ctl, _files, print_errors, test_once):
+    def __init__(self, ctl, _files, print_errors):
         self.__ctl = ctl
         self.__files = _files
         self.__print_errors = print_errors
-        self.__test_once = test_once
         # rest
         self.__shown = None
         self.__model = 0
@@ -392,9 +400,6 @@ class Tester:
         return self.__shown
 
     def test(self, shown, length):
-        if self.__model and self.__test_once:
-            log("SERIALIZABLE?", PRINT)
-            return True
         # do test
         ctl = clingo.Control(["--warn=none"])#, "--output-debug=text"])
         for i in self.__files:
@@ -463,13 +468,11 @@ class Solver:
 
         # tester
         self.__test = False if options['test'] is None else True
-        self.__run_test = self.__test
         self.__shown = None
         self.__tester = None
         if self.__test:
             self.__tester = Tester(
-                self.__ctl, options['test'],
-                options['print_errors'], options['test_once']
+                self.__ctl, options['test'], options['print_errors']
             )
 
     def __print_model(self, shown):
@@ -604,28 +607,18 @@ class Solver:
         self.__last_length = length
 
         # test
-        if result.satisfiable and self.__run_test:
-            while True:
-                log("Testing...", PRINT)
-                if self.__verbose: self.__verbose_start()
-                # run the test
-                test_result = self.__tester.test(self.__shown, self.__length)
-                if self.__verbose: self.__verbose_end("Testing")
-                # if passed, return SAT
-                if test_result:
-                    self.__print_model(self.__shown)
-                    return SATISFIABLE
-                # return UNKNOWN
-                if not self.__options["test_until_not_sat"]:
-                    return UNKNOWN
-                # unless test_until_unsat
-                log("Solving...", PRINT)
-                if self.__verbose: self.__verbose_start()
-                result = self.__ctl.solve(on_model=self.__on_model)
-                if self.__verbose: self.__verbose_end("Solving")
-                log(str(result))
-                if not result.satisfiable:
-                    break
+        if result.satisfiable and self.__test:
+            log("Testing...", PRINT)
+            if self.__verbose: self.__verbose_start()
+            test_result = self.__tester.test(self.__shown, self.__length)
+            if self.__verbose: self.__verbose_end("Testing")
+            if self.__options['test_once']:
+                self.__test = False
+            if test_result:
+                self.__print_model(self.__shown)
+                return SATISFIABLE
+            else:
+                return UNKNOWN
 
         # return
         if result.satisfiable:
@@ -635,225 +628,167 @@ class Solver:
         else:
             return UNKNOWN
 
-    def add_actions_constraint(self, actions):
-        constraint = ":- " + actions[:-1].replace(".", ",") + "."
-        self.actions_constraint = constraint
+class SolverDLP:
 
-#
-# CHECKER
-# 
+    def __init__(self, dlp, options):
 
-PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
-POSTPROCESS   = PLASP_DIR + "encodings/strips/postprocess.lp"
-
-class Checker(object):
-    
-    checks_performed = 0
-    time = 0
-    
-    def __init__(self):
-        self.hasModel = False
-    
-    @staticmethod
-    def check(model):
-        Checker.checks_performed += 1
-        starttime = time()
-        
-        with open("model.lp", "w") as m:
-            m.writelines(model)
-
-        control = clingo.Control()
-        control.load(POSTPROCESS)
-        control.add(BASE, [], model)
-        
-        checker = Checker() 
-        res = checker.solve(control)
-        Checker.time += time() - starttime
-
-        return res
-
-    def solve(self, control):
-        control.ground([("base", [])])
-        control.solve(on_model=self.on_model)
-        return self.hasModel
-        
-    def on_model(self, model):
-        
-        self.hasModel = True
-
-#
-# CHECKER 2
-#
-PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
-ENCODING      = PLASP_DIR + "encodings/strips/strips-incremental.lp"
-PREPROCESS    = PLASP_DIR + "encodings/strips/preprocess.lp"
-CHECKER       = """
-#program base.
-#external goal(N,V) :  contains(N,V).
-#external initialState(N,V) : contains(N,V).
-
-#program step(t).
-:- {occurs(A,t)} > 1.
-
-#program check(t).
-#external query(t).
-"""
-class Checker2(object):
-    
-    checks_performed = 0
-    assumptions_from_model = ["postcondition", "precondition", "action", "variable", "contains", "costs"]
-    
-    def __init__(self, enc, pre, check):
-        self.has_model = False
-        self.control = clingo.Control(["--warn=none"])
-        self.control.load(enc)
-        self.control.load(pre)
-        self.control.add(BASE, [], check)
-        
-        self.__instance_loaded = False
-        self.__prev_init = []
-        self.__prev_goal = []
+        self.__dlp         = dlp
+        self.__length      = 0
         self.__last_length = 0
-        self.__length = 0
-        self.__all_actions = []
-        self.time = 0
-        self.timegrounding = 0
-        self.timesolving = 0
-        self.timebaseground = 0
-        self.timeextractinginfo = 0
+        self.__options     = options
+        self.__verbose     = options['verbose']
+        if self.__verbose: self.__memory = memory_usage()
+        self.__models      = 0
 
-    def extract_instance(self, model):
-        inst_str = ""
-        for atom in model:
-            if atom.name in Checker2.assumptions_from_model:
-                inst_str += str(atom) + ".\n"
-            elif atom.name == "action":
-                self.__all_actions.append(atom.arguments[0])
+        # mem
+        self.__mem         = True if options['check_mem'] else False
+        self.__mem_limit   = options['check_mem']*0.9
+        self.__mem_max     = 0
+        self.__mem_before  = 0
 
-        return inst_str
+        self.__move_query = options['move_query'] 
 
-    def extract_step_atoms(self, step, model):
-        step_actions = []
-        step_init = []
-        step_goal = []
-        
-        for atom in model:
-            if atom.name == "occurs" and atom.arguments[1].number == step:
-                step_actions.append(atom.arguments[0])
-            elif atom.name == "holds":
-                if atom.arguments[2].number == step-1:
-                    step_init.append(atom)
-                elif atom.arguments[2].number == step:
-                    step_goal.append(atom)
+        # tester
+        self.__test = False if options['test'] is None else True
+        self.__shown = None
+        self.__tester = None
+        if self.__test:
+            self.__tester = Tester(
+                self.__ctl, options['test'], options['print_errors']
+            )
 
-        step_init, step_goal = self.init_goal_externals(step_init, step_goal)
+    def __print_model(self, shown):
+        if self.__options['outf'] == 0:
+            log("Answer: {}\n{}".format(self.__models, " ".join(shown)), PRINT)
+        else:
+            line = " ".join([x + "." for x in shown])
+            log("ANSWER\n{}".format(line), FORCE_PRINT)
 
-        return step_actions, step_init, step_goal
+    def __on_model(self, m):
+        self.__models += 1
+        shown = [ str(x) for x in m.symbols(shown = True) ]
+        if self.__test:
+            if self.__options['print_nonserial']:
+                self.__print_model(shown)
+            self.__shown = shown
+        else:
+            self.__print_model(shown)
 
-    def init_goal_externals(self, init, goal):
+    # to get rid of clingo error when using the tester
+    def get_shown(self):
+        return []
 
-        i = []
-        for atom in init:
-            newatom = clingo.Function("initialState", [atom.arguments[0], atom.arguments[1]])
-            i.append(newatom)
-        
-        g = []     
-        for atom in goal:
-            newatom = clingo.Function("goal", [atom.arguments[0], atom.arguments[1]])
-            g.append(newatom)
-        
-        return i, g
+    def get_models(self):
+        return self.__models
 
-    def actions_assumptions(self, actions):
-        maxsteps = len(actions)
-        assumpt = []
-        for action in self.__all_actions:
-            if action not in actions:
-                for step in xrange(1, maxsteps + 1):
-                    assumpt.append((clingo.Function("occurs",[action, clingo.Number(step)]), False))
+    def __verbose_start(self):
+        self.__time0 = clock()
 
-        return assumpt
+    def __verbose_end(self, string):
+        log(string+" Time:\t {:.2f}s".format(clock()-self.__time0))
+        memory = memory_usage()
+        if self.__memory == -1 or memory == -1: 
+            return
+        log("Memory:\t\t "+str(memory)+"MB (+"+str(memory-self.__memory)+"MB)")
+        self.__memory = memory
 
+    def __mem_check_limit(self, length):
+        self.__mem_before = memory_usage("VmSize")
+        log("Expected Memory: {}MB".format(
+            self.__mem_before + (self.__mem_max*length)
+        ))
+        if self.__mem_limit < (self.__mem_before + (self.__mem_max*length)):
+            return True
+        return False
 
-    def check(self, model, length):
-        Checker2.checks_performed += 1
-        starttime = time()
+    def __mem_set_max(self, length):
+        self.__mem_max = max(self.__mem_max, (
+            memory_usage("VmSize") - self.__mem_before
+        )/float(length))
 
-        if not self.__instance_loaded:
-            t = time()
-            self.control.add(BASE, [], self.extract_instance(model))
-            self.control.ground([(BASE, [])])
-            self.timebaseground += time() - t
-            self.__instance_loaded = True
-        
-        for step in xrange(1, length+1):
-            t = time()
-            acts, init_ext, goal_ext = self.extract_step_atoms(step, model)
-            assumptions = self.actions_assumptions(acts)
-            self.timeextractinginfo += time() - t
-            self.solve(len(acts), init_ext, goal_ext, assumptions)
-            if not self.has_model:
-                print "Can not serialize step: ", step
-                self.time += time() - starttime
-                return False
+    def solve(self, length):
 
-        self.time += time() - starttime
-        return True
+        log("Grounded Until:\t {}".format(self.__length))
 
-    def solve(self, maxsteps, init, goal, action_assumptions):
-        self.has_model = False
-        t = time()
+        # ground if necessary
+        grounded = 0
+        if self.__length < length:
+            if self.__mem and self.__mem_check_limit(length-self.__length):
+                log("Skipping: not enough memory for grounding...\n")
+                return NO_MEM
 
-        for a in self.__prev_goal + self.__prev_init:
-            self.control.assign_external(a, False)
+            if not self.__move_query:
+                self.__dlp.release_external(
+                    clingo.Function(QUERY,[self.__length])
+                )
+            log("Grounding...\t " + str(self.__length+1)+ ", " + str(length))
+            if self.__verbose: self.__verbose_start()
+            if self.__test:
+                parts += self.__tester.get_parts(self.__length+1, length+1)
 
-        for a in init + goal:
-            self.control.assign_external(a, True)
+            self.__dlp.ground(self.__length+1, length)
 
-        self.__prev_goal, self.__prev_init = goal, init
+            if self.__verbose: self.__verbose_end("Grounding")
+            for t in range(self.__length + 1, length):
+                self.__dlp.release_external(
+                    clingo.Function(QUERY, [t])
+                )
+            if not self.__move_query:
+                self.__dlp.assign_external(
+                    clingo.Function(QUERY,[length]),True
+                )
+            self.__dlp.cleanup()
+            grounded      = length - self.__length
+            self.__length = length
 
-        if self.__length == 0:
-            self.control.ground([("step", [1]), ("check", [1])])
-            self.__length = 1
+        # blocking or unblocking actions
+        if length < self.__last_length:
+            log("Blocking actions...")
+            for t in range(length+1, self.__last_length+1):
+                self.__dlp.assign_external(clingo.Function(SKIP,[t]), True)
+        elif self.__last_length < length:
+            log("Unblocking actions...")
+            for t in range(self.__last_length+1, length+1):
+                self.__dlp.assign_external(clingo.Function(SKIP,[t]), False)
 
-        elif self.__length < maxsteps:
-            parts = []
-            parts += [("check", [step]) for step in xrange(self.__length + 1, maxsteps + 1)]
-            parts += [("step", [step]) for step in xrange(self.__length + 1, maxsteps + 1)]
+        # solve
+        log("Solving...", PRINT)
+        if self.__verbose: self.__verbose_start()
+        if self.__move_query:
+            self.__dlp.assign_external(
+                clingo.Function(QUERY,[self.__last_length]), False
+            )
+            self.__dlp.assign_external(
+                clingo.Function(QUERY,[length]), True
+            )
+        result = self.__dlp.solve(on_model=self.__on_model)
+        if self.__verbose: self.__verbose_end("Solving")
+        log(str(result))
+        if self.__mem and grounded:
+            self.__mem_set_max(grounded)
+        self.__last_length = length
 
-            self.control.cleanup()
+        # test
+        if result.satisfiable and self.__test:
+            log("Testing...", PRINT)
+            if self.__verbose: self.__verbose_start()
+            test_result = self.__tester.test(self.__shown, self.__length)
+            if self.__verbose: self.__verbose_end("Testing")
+            if self.__options['test_once']:
+                self.__test = False
+            if test_result:
+                self.__print_model(self.__shown)
+                return SATISFIABLE
+            else:
+                return UNKNOWN
 
-            self.control.ground(parts)
-
-            self.__length = maxsteps
-
-        self.control.assign_external(clingo.Function("query", [self.__last_length]), False)
-        self.control.assign_external(clingo.Function("query", [maxsteps]), True)
-        self.__last_length = maxsteps
-        self.timegrounding += time() - t
-        t = time()
-        self.ret = self.control.solve(assumptions=action_assumptions, on_model=self.on_model)
-
-        self.timesolving += time() - t
-
-    def on_model(self, model):
-        self.has_model = True
-    
-    def print_stats(self):
-        print "Checking time2: ", self.time
-        print "time to ground base: ", self.timebaseground
-        print "time to ground: ", self.timegrounding
-        print "time to solve: ", self.timesolving
-        print "time extracting info: ", self.timeextractinginfo
-        print "Max step length: ", self.__length
-
-class SolveResult(object):
-
-    def __init__(self, sat=None, unsat=None, unknown=None):
-        self.satisfiable = sat
-        self.unsatisfiable = unsat
-        self.unknown = unknown
-
+        # return
+        if result.satisfiable:
+            return SATISFIABLE
+        elif result.unsatisfiable:
+            return UNSATISFIABLE
+        else:
+            return UNKNOWN
 #
 # PLANNER
 #
@@ -861,39 +796,42 @@ class SolveResult(object):
 class Planner:
 
     def run(self,options,clingo_options):
-
-        time0 = clock()
-        ctl = clingo.Control(clingo_options)
+        
+        files = []
+        program = ""
 
         # input files
+
+        instance_name = "instance-name-test.lp"
+
         for i in options['files']:
-            print i
-            ctl.load(i)
+            files.append(i)
         if options['read_stdin']:
-<<<<<<< 835d8d789e3df0ce06c992b122967cb28fac9370
-            ctl.add(BASE, [], get_stdin())
-=======
-            instance = sys.stdin.read()
-            ctl.add(BASE,[],instance)
->>>>>>> Add sequential checker and fix the value of result after failed check
-
+            #with open(instance_name, "w") as f:
+            #    f.write(get_stdin())
+            #files.append(instance_name)
+            program += get_stdin()
+        
         # additional programs
-        ctl.add(BASE,[],EXTERNALS_PROGRAM)
-        if options['test']:
-            ctl.add(BASE,[],TEST_NO_WARNING)
-        if options['forbid_actions']: 
-            ctl.add(BASE, [], FORBID_ACTIONS_PROGRAM)
-        if options['force_actions']:  
-            ctl.add(BASE, [], FORCE_ACTIONS_PROGRAM)
 
-        # ground base, and set initial query
-        ctl.ground([(BASE,[]), (CHECK,[0])])
-        ctl.assign_external(clingo.Function(QUERY,[0]), True)
+        program += EXTERNALS_PROGRAM
+        if options['test']:
+            program += TEST_NO_WARNING
+        if options['forbid_actions']: 
+            program += FORBID_ACTIONS_PROGRAM
+        if options['force_actions']:  
+            program += FORCE_ACTIONS_PROGRAM
+
+        #dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
+        dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+
+        dlp.start()
+
+        dlp.assign_external(clingo.Function(QUERY,[0]), True)
 
         # solver
-        solver = Solver(ctl,options)
-        # checker
-        checker2 = Checker2(ENCODING, PREPROCESS, CHECKER)
+        solver = SolverDLP(dlp,options)         
+
         # scheduler
         # check argument error
         if sum([1 for i in ['A','B','C'] if options[i] is not None])>1: 
@@ -924,8 +862,7 @@ class Planner:
         verbose = options['verbose']
         memory = memory_usage()
         if verbose and memory!=-1:
-            log("\nTime:\t {:.2f}s".format(clock()- time0))
-            log("Memory: {}MB\n".format(memory))
+            log("\nMemory: {}MB\n".format(memory))
 
         # loop
         i=1
@@ -941,42 +878,26 @@ class Planner:
                 log("PLAN NOT FOUND",PRINT)
                 break  
             result = solver.solve(length)
-<<<<<<< 835d8d789e3df0ce06c992b122967cb28fac9370
             if result != NO_MEM and length > max_length:
                 max_length = length
             if result == SATISFIABLE:
                 log("SATISFIABLE",PRINT)
                 sol_length = length
                 break
-=======
-            if result is not None and length > max_length: max_length = length
-            if result is not None and result.satisfiable:
-                check1 = Checker.check(solver.model)
-                #check2 = checker2.check(solver.model_as_atoms, length)
-                #print check1, check2
-                if check1:# and check2:
-                    print "check successful"
-                    print "Checks performed: ", Checker.checks_performed
-                    #print "Checks performed: ", checker2.checks_performed
-                    print "Checking time: ", Checker.time
-                    #checker2.print_stats()
-                    log("SATISFIABLE",PRINT)
-                    sol_length = length
-                    break
-                print "check unsuccessful"
-                #solver.add_actions_constraint(solver.actions)
-                result = SolveResult(unknown=True)
-                
-                # to stop after first check uncomment the break!
-                #break
-
->>>>>>> Add sequential checker and fix the value of result after failed check
             if verbose: log("Iteration Time:\t {:.2f}s\n".format(clock()-time0))
 
+            #log("\n" + clingo_stats.Stats().summary(ctl),PRINT)
+            #if options['stats']:
+            #    log(clingo_stats.Stats().statistics(ctl),PRINT)
+            if i==12:
+                pass #break
+
         # stats
-        log("\n" + clingo_stats.Stats().summary(ctl),PRINT)
+
+        log("\n" + clingo_stats.Stats().summary(dlp.control),PRINT)
+        log("\nDLP grounding time: " + str(dlp.ground_time), PRINT)
         if options['stats']:
-            log(clingo_stats.Stats().statistics(ctl),PRINT)
+            log(clingo_stats.Stats().statistics(dlp.control),PRINT)
             # peak memory
             peak = memory_usage("VmPeak")
             if peak != -1: 
@@ -987,8 +908,6 @@ class Planner:
             if options['test']:
                 log("Models       : {}".format(solver.get_models()), PRINT)
             log("",PRINT)
-            
-
 
 
 
@@ -1071,10 +990,6 @@ Get help/report bugs via : https://potassco.org/support
         solving.add_argument(
             '--test-once', dest='test_once', action="store_true",
             help="Test solution only once (using option --test)"
-        )
-        solving.add_argument(
-            '--test-until-not-sat', dest='test_until_not_sat', action="store_true",
-            help="Test solutions of one time point until not SAT (using option --test)"
         )
         solving.add_argument(
             '--query-at-last',dest='move_query',action="store_false",
