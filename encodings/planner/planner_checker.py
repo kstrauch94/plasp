@@ -664,6 +664,7 @@ class Planner:
 
         # input files
         for i in options['files']:
+            print i
             ctl.load(i)
         if options['read_stdin']:
             instance = sys.stdin.read()
