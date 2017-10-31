@@ -22,8 +22,15 @@ INSTANCE11=../../../instances-hard/ipc-2002/domains/depots-strips-automatic/inst
 
 INSTANCE12=../../../instances-easy/ipc-2002/domains/driverlog-strips-automatic/instances/instance-14.pddl
 
+INSTANCE13=../../../instances-easy/ipc-2000/domains/blocks-strips-typed/instances/instance-20.pddl
+
+INSTANCE14=../../../instances-hard/ipc-2000/domains/blocks-strips-typed/instances/instance-27.pddl
 
 
-python -B runplanner.py $INSTANCE1 --translate --parallel=0
-#python -B runplanner.py $INSTANCE12 --translate --parallel=0 --heuristic=Domain heuristic.lp
+
+INSTANCE15=../../../instances-easy/ipc-2002/domains/driverlog-strips-automatic/instances/instance-14.pddl
+
+
+python  runplanner.py $INSTANCE13 --translate --parallel=0 
+#python runplanner.py $INSTANCE13 --translate --parallel=0 --heuristic=Domain heuristic.lp --verbose
 

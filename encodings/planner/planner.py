@@ -10,7 +10,6 @@ import sys
 import argparse
 import re
 from time import clock
-from time import time
 import clingo_stats
 import os
 
@@ -35,7 +34,7 @@ def get_stdin():
 # LOGGING
 #
 
-outf        = 3
+outf        = 0
 FORCE_PRINT = 1
 PRINT       = 2
 VERBOSE     = 3
@@ -438,9 +437,7 @@ class Solver:
                 options['conflicts_per_restart']
             )
 
-        self.__move_query = options['move_query']
-
-        self.actions_constraint = None
+        self.__move_query = options['move_query'] 
 
         # tester
         self.__test = False if options['test'] is None else True
@@ -468,13 +465,6 @@ class Solver:
                 self.__print_model(shown)
             self.__shown = shown
         else:
-<<<<<<< HEAD:encodings/planner/planner_checker.py
-            log("ANSWER\n" + " ".join([str(x)+"." for x in m.symbols(shown=True)]),FORCE_PRINT)
-        
-        self.actions = " ".join([str(x)+"." for x in m.symbols(shown=True)])
-        self.model = "\n".join([str(x)+"." for x in m.symbols(atoms=True)])
-        self.model_as_atoms = [x for x in m.symbols(atoms=True)]
-=======
             self.__print_model(shown)
 
     # to get rid of clingo error when using the tester
@@ -483,7 +473,6 @@ class Solver:
 
     def get_models(self):
         return self.__models
->>>>>>> upstream/master:encodings/planner/planner.py
 
     def __verbose_start(self):
         self.__time0 = clock()
@@ -555,12 +544,6 @@ class Solver:
             for t in range(self.__last_length+1, length+1):
                 self.__ctl.assign_external(clingo.Function(SKIP,[t]), False)
 
-        #add actions contraint
-        if self.actions_constraint is not None:
-            self.__ctl.add(BASE, [], self.actions_constraint)
-            self.__ctl.ground([(BASE, [])])
-            self.actions_constraint = None
-
         # solve
         log("Solving...", PRINT)
         if self.__verbose: self.__verbose_start()
@@ -610,224 +593,6 @@ class Solver:
         else:
             return UNKNOWN
 
-    def add_actions_constraint(self, actions):
-        constraint = ":- " + actions[:-1].replace(".", ",") + "."
-        self.actions_constraint = constraint
-
-#
-# CHECKER
-# 
-
-PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
-POSTPROCESS   = PLASP_DIR + "encodings/strips/postprocess.lp"
-
-class Checker(object):
-    
-    checks_performed = 0
-    time = 0
-    
-    def __init__(self):
-        self.hasModel = False
-    
-    @staticmethod
-    def check(model):
-        Checker.checks_performed += 1
-        starttime = time()
-        
-        with open("model.lp", "w") as m:
-            m.writelines(model)
-
-        control = clingo.Control()
-        control.load(POSTPROCESS)
-        control.add(BASE, [], model)
-        
-        checker = Checker() 
-        res = checker.solve(control)
-        Checker.time += time() - starttime
-
-        return res
-
-    def solve(self, control):
-        control.ground([("base", [])])
-        control.solve(on_model=self.on_model)
-        return self.hasModel
-        
-    def on_model(self, model):
-        
-        self.hasModel = True
-
-#
-# CHECKER 2
-#
-PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
-ENCODING      = PLASP_DIR + "encodings/strips/strips-incremental.lp"
-PREPROCESS    = PLASP_DIR + "encodings/strips/preprocess.lp"
-CHECKER       = """
-#program base.
-#external goal(N,V) :  contains(N,V).
-#external initialState(N,V) : contains(N,V).
-
-#program step(t).
-:- {occurs(A,t)} > 1.
-
-#program check(t).
-#external query(t).
-"""
-class Checker2(object):
-    
-    checks_performed = 0
-    assumptions_from_model = ["postcondition", "precondition", "action", "variable", "contains", "costs"]
-    
-    def __init__(self, enc, pre, check):
-        self.has_model = False
-        self.control = clingo.Control(["--warn=none"])
-        self.control.load(enc)
-        self.control.load(pre)
-        self.control.add(BASE, [], check)
-        
-        self.__instance_loaded = False
-        self.__prev_init = []
-        self.__prev_goal = []
-        self.__last_length = 0
-        self.__length = 0
-        self.__all_actions = []
-        self.time = 0
-        self.timegrounding = 0
-        self.timesolving = 0
-        self.timebaseground = 0
-        self.timeextractinginfo = 0
-
-    def extract_instance(self, model):
-        inst_str = ""
-        for atom in model:
-            if atom.name in Checker2.assumptions_from_model:
-                inst_str += str(atom) + ".\n"
-            elif atom.name == "action":
-                self.__all_actions.append(atom.arguments[0])
-
-        return inst_str
-
-    def extract_step_atoms(self, step, model):
-        step_actions = []
-        step_init = []
-        step_goal = []
-        
-        for atom in model:
-            if atom.name == "occurs" and atom.arguments[1].number == step:
-                step_actions.append(atom.arguments[0])
-            elif atom.name == "holds":
-                if atom.arguments[2].number == step-1:
-                    step_init.append(atom)
-                elif atom.arguments[2].number == step:
-                    step_goal.append(atom)
-
-        step_init, step_goal = self.init_goal_externals(step_init, step_goal)
-
-        return step_actions, step_init, step_goal
-
-    def init_goal_externals(self, init, goal):
-
-        i = []
-        for atom in init:
-            newatom = clingo.Function("initialState", [atom.arguments[0], atom.arguments[1]])
-            i.append(newatom)
-        
-        g = []     
-        for atom in goal:
-            newatom = clingo.Function("goal", [atom.arguments[0], atom.arguments[1]])
-            g.append(newatom)
-        
-        return i, g
-
-    def actions_assumptions(self, actions):
-        maxsteps = len(actions)
-        assumpt = []
-        for action in self.__all_actions:
-            if action not in actions:
-                for step in xrange(1, maxsteps + 1):
-                    assumpt.append((clingo.Function("occurs",[action, clingo.Number(step)]), False))
-
-        return assumpt
-
-
-    def check(self, model, length):
-        Checker2.checks_performed += 1
-        starttime = time()
-
-        if not self.__instance_loaded:
-            t = time()
-            self.control.add(BASE, [], self.extract_instance(model))
-            self.control.ground([(BASE, [])])
-            self.timebaseground += time() - t
-            self.__instance_loaded = True
-        
-        for step in xrange(1, length+1):
-            t = time()
-            acts, init_ext, goal_ext = self.extract_step_atoms(step, model)
-            assumptions = self.actions_assumptions(acts)
-            self.timeextractinginfo += time() - t
-            self.solve(len(acts), init_ext, goal_ext, assumptions)
-            if not self.has_model:
-                print "Can not serialize step: ", step
-                self.time += time() - starttime
-                return False
-
-        self.time += time() - starttime
-        return True
-
-    def solve(self, maxsteps, init, goal, action_assumptions):
-        self.has_model = False
-        t = time()
-
-        for a in self.__prev_goal + self.__prev_init:
-            self.control.assign_external(a, False)
-
-        for a in init + goal:
-            self.control.assign_external(a, True)
-
-        self.__prev_goal, self.__prev_init = goal, init
-
-        if self.__length == 0:
-            self.control.ground([("step", [1]), ("check", [1])])
-            self.__length = 1
-
-        elif self.__length < maxsteps:
-            parts = []
-            parts += [("check", [step]) for step in xrange(self.__length + 1, maxsteps + 1)]
-            parts += [("step", [step]) for step in xrange(self.__length + 1, maxsteps + 1)]
-
-            self.control.cleanup()
-
-            self.control.ground(parts)
-
-            self.__length = maxsteps
-
-        self.control.assign_external(clingo.Function("query", [self.__last_length]), False)
-        self.control.assign_external(clingo.Function("query", [maxsteps]), True)
-        self.__last_length = maxsteps
-        self.timegrounding += time() - t
-        t = time()
-        self.ret = self.control.solve(assumptions=action_assumptions, on_model=self.on_model)
-
-        self.timesolving += time() - t
-
-    def on_model(self, model):
-        self.has_model = True
-    
-    def print_stats(self):
-        print "Checking time2: ", self.time
-        print "time to ground base: ", self.timebaseground
-        print "time to ground: ", self.timegrounding
-        print "time to solve: ", self.timesolving
-        print "time extracting info: ", self.timeextractinginfo
-        print "Max step length: ", self.__length
-
-class SolveResult(object):
-
-    def __init__(self, sat=None, unsat=None, unknown=None):
-        self.satisfiable = sat
-        self.unsatisfiable = unsat
-        self.unknown = unknown
 
 #
 # PLANNER
@@ -842,15 +607,9 @@ class Planner:
 
         # input files
         for i in options['files']:
-            print i
             ctl.load(i)
         if options['read_stdin']:
-<<<<<<< HEAD:encodings/planner/planner_checker.py
-            instance = sys.stdin.read()
-            ctl.add(BASE,[],instance)
-=======
             ctl.add(BASE, [], get_stdin())
->>>>>>> upstream/master:encodings/planner/planner.py
 
         # additional programs
         ctl.add(BASE,[],EXTERNALS_PROGRAM)
@@ -867,8 +626,7 @@ class Planner:
 
         # solver
         solver = Solver(ctl,options)
-        # checker
-        checker2 = Checker2(ENCODING, PREPROCESS, CHECKER)
+
         # scheduler
         # check argument error
         if sum([1 for i in ['A','B','C'] if options[i] is not None])>1: 
@@ -916,36 +674,12 @@ class Planner:
                 log("PLAN NOT FOUND",PRINT)
                 break  
             result = solver.solve(length)
-<<<<<<< HEAD:encodings/planner/planner_checker.py
-            if result is not None and length > max_length: max_length = length
-            if result is not None and result.satisfiable:
-                check1 = Checker.check(solver.model)
-                #check2 = checker2.check(solver.model_as_atoms, length)
-                #print check1, check2
-                if check1:# and check2:
-                    print "check successful"
-                    print "Checks performed: ", Checker.checks_performed
-                    #print "Checks performed: ", checker2.checks_performed
-                    print "Checking time: ", Checker.time
-                    #checker2.print_stats()
-                    log("SATISFIABLE",PRINT)
-                    sol_length = length
-                    break
-                print "check unsuccessful"
-                #solver.add_actions_constraint(solver.actions)
-                result = SolveResult(unknown=True)
-                
-                # to stop after first check uncomment the break!
-                #break
-
-=======
             if result != NO_MEM and length > max_length:
                 max_length = length
             if result == SATISFIABLE:
                 log("SATISFIABLE",PRINT)
                 sol_length = length
                 break
->>>>>>> upstream/master:encodings/planner/planner.py
             if verbose: log("Iteration Time:\t {:.2f}s\n".format(clock()-time0))
             #log("\n" + clingo_stats.Stats().summary(ctl),PRINT)
             #if options['stats']:
@@ -966,7 +700,6 @@ class Planner:
                 log("Models       : {}".format(solver.get_models()), PRINT)
             log("",PRINT)
             
-
 
 
 
