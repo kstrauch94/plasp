@@ -867,6 +867,7 @@ class Planner:
 
         # input files
         for i in options['files']:
+            print i
             ctl.load(i)
         if options['read_stdin']:
 <<<<<<< 835d8d789e3df0ce06c992b122967cb28fac9370
