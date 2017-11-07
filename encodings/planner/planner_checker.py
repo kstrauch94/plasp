@@ -361,7 +361,11 @@ FORBID_ACTIONS_PROGRAM = """
 """
 FORCE_ACTIONS_PROGRAM = """
 #program step(t).
-:- not occurs(A,t):action(A); not skip(t). % some action
+:- not occurs(A,t):action(A); not skip(t). % some actiont 
+"""
+FORCE_ACTIONS_PROGRAM_NEW = """
+%someactionat(t) :- occurs(A,t).
+%:- not someactionat(t), not skip(t).
 """
 FORCE_ACTIONS_PROGRAM_OLD = """
 #program step(t).
@@ -822,8 +826,8 @@ class Planner:
         if options['force_actions']:  
             program += FORCE_ACTIONS_PROGRAM
 
-        #dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
-        dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+        dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
+        #dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
 
         dlp.start()
 

@@ -103,8 +103,7 @@ effect(X,t) :- occurs(A,t), postcondition(A,X,V), fluent(X), not precondition(A,
 
 % Checks w.r.t. parallel mode
 
-:- _parallel != 0, _parallel != 1, _parallel != 2, _parallel != 3, _parallel != 4,
-   #count{A : occurs(A,t)} > 1.
+:- _parallel != 1, _parallel != 2, _parallel != 3, _parallel != 4, #count{A : occurs(A,t)} > 1.
 
 :- _parallel != 2, occurs(A,t), precondition(A,X,V), not holds(X,V,t-1).
 
