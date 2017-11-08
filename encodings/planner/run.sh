@@ -9,11 +9,11 @@ INSTANCE3=blocks-strips-typed/instances/instance-12.pddl
 INSTANCE4=ins3.lp
 
 
-# text DLP
-#python -B runplanner.py $INSTANCE1 --translate --parallel=0 --basic
-
-# basic DLP
+# test
 python -B runplanner.py $INSTANCE1 --translate --parallel=0 
+
+# text DLP
+#python -B runplanner.py $INSTANCE1 --dlp=text
 
 
 #python runplanner.py $INSTANCE1 --translate --parallel=0 --heuristic=Domain heuristic.lp --verbose
