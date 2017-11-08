@@ -628,9 +628,13 @@ class Planner:
             program += FORBID_ACTIONS_PROGRAM
         if options['force_actions']:  
             program += FORCE_ACTIONS_PROGRAM
-
-        dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
-        #dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+        
+        if options["dlp"] is None:
+            dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+        elif options["dlp"] == DLP_TEXT:
+            dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
+        elif options["dlp"] == DLP_BACKEND:
+            dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
 
         dlp.start()
 
@@ -724,6 +728,19 @@ class Planner:
 
 VERSION = "0.0.1"
 
+#DLPs
+DLP_BASIC   = "basic"
+DLP_TEXT    = "text"
+DLP_BACKEND = "backend"
+DLP_BACKEND_SIMPLIFIED = "backend-simplified"
+
+#DLP encodings
+
+DLP_BASIC_ENCODING = "basic.lp" # or strips inc?
+DLP_TEXT_ENCODING  = "basic-text.lp"
+DLP_BACKEND_ENCODING = "basic-backend.lp"
+
+
 class PlannerArgumentParser:
 
     clingo_help = """
@@ -814,6 +831,9 @@ Get help/report bugs via : https://potassco.org/support
             '--check-at-last',dest='check_at_last',action="store_true",
             help="Ground check program only for the current latest time point"
         )
+
+        solving.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED],
+            help='Use the specified DLP with its apropriate encoding')
 
         # Scheduler
         scheduler = cmd_parser.add_argument_group('Scheduler Options')
