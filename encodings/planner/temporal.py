@@ -7,6 +7,9 @@ from collections import namedtuple
 from time import clock
 from math import copysign
 
+
+from ClingoGrounder import DynamicLogicProgram
+
 # DEFINES
 STR_UNSAT = "error: input program is UNSAT"
 GROUNDING_ERROR = "error: invalid grounding steps"
@@ -634,17 +637,17 @@ class DynamicLogicProgramContainer:
         self.output_facts = output_facts
         self.init = init
 
-class DynamicLogicProgramBackend:
+class DynamicLogicProgramBackend(DynamicLogicProgram):
 
-    def __init__(self, files, program, options, clingo_options):
-
+    def __init__(self, files, program="", options=[], clingo_options=[]):
+        
         # preprocessing
         generator_class = self.get_generator_class()
         generator = generator_class(
             files = files,
             adds  = [("base", [], program)],
             parts = [("base", [])],
-            options = options,
+            options = clingo_options,
             #compute_cautious = False,
             #compute_brave = False
         )
@@ -707,13 +710,23 @@ class DynamicLogicProgramBackend:
             for symbol in self.normal_externals.keys():
                 self.assigned_externals[(step, symbol)] = -1
 
-    def assign_external(self, step, symbol, value):
+    def assign_external(self, clingo_symbol, value):
+        print(type(clingo_symbol.arguments[0].number))
+        if len(clingo_symbol.arguments) != 1:
+            print("ERROR:Clingo symbol must have one int argument!")
+            raise ValueError
+        step = int(clingo_symbol.arguments[-1].number)
+        symbol = clingo_symbol.name
         if value is None:
             self.assigned_externals.pop((step, symbol), None)
         else:
             self.assigned_externals[(step, symbol)] = 1 if value else -1
 
-    def release_external(self, step, symbol):
+    def release_external(self, clingo_symbol):
+        if len(clingo_symbol.arguments) != 1 or not isinstance(clingo_symbol.arguments[0],int):
+            raise Error
+        step = clingo_symbol.arguments[-1]
+        symbol = clingo_symbol.name
         self.assigned_externals.pop((step, symbol), None)
         self.backend.add_rule(
             [], [self.normal_externals[symbol]+(step*self.offset)], False
@@ -806,7 +819,7 @@ class DynamicLogicProgramBackend:
 
 class DynamicLogicProgramBackendSimplified:
 
-    def __init__(self, files, program, options, clingo_options):
+    def __init__(self, files, program="", options=[], clingo_options=[]):
 
         # preprocessing
         generator_class = self.get_generator_class()
@@ -814,7 +827,7 @@ class DynamicLogicProgramBackendSimplified:
             files = files,
             adds  = [("base", [], program)],
             parts = [("base", [])],
-            options = options,
+            options = clingo_options,
             compute_cautious = False,
             compute_brave = False
         )
@@ -844,6 +857,7 @@ class DynamicLogicProgramBackendSimplified:
 
 def incmode():
 
+    """
     # preprocessing
     #generator_class = DLPGenerator
     generator_class = DLPGeneratorSimplifier
@@ -861,6 +875,9 @@ def incmode():
     dlp = generator.run()
     dlp.start()
     #print(dlp); return
+    """
+
+    dlp = DynamicLogicProgramBackend(["example.lp"])    
 
     # loop
     step, ret = 1, None
