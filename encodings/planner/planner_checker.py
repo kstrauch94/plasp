@@ -15,6 +15,7 @@ import clingo_stats
 import os
 
 import ClingoGrounder
+import temporal
 
 # 
 # DEFINES
@@ -634,7 +635,10 @@ class Planner:
         elif options["dlp"] == DLP_TEXT:
             dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
         elif options["dlp"] == DLP_BACKEND:
-            dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+            dlp = temporal.DynamicLogicProgramBackend(files, program, options, clingo_options)
+            print(dlp)
+        elif options["dlp"] == DLP_BACKEND_SIMPLIFIED:
+            dlp = temporal.DynamicLogicProgramBackendSimplified(files, program, options, clingo_options)
 
         dlp.start()
 
