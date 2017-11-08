@@ -35,11 +35,11 @@ init(holds(X,V)) :- initialState(X,V). %, fluent(X).
 
 % Check goal conditions
 
-:- last, goal(X,V), not holds(X,V).
+:- query(t), goal(X,V), not holds(X,V).
 #show occurs/1.
 
 % NEW: GENERATE STATE
 #external holds'(X,V) : contains(X,V).
 
 % NEW: LAST ATOM
-#external last.
+#external query(1..100).
