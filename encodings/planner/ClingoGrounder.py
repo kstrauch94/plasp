@@ -18,7 +18,6 @@ class Grounder(object):
 
         self.debug = debug
         self.debug_gf_name = "g.lp"
-
         # write program + time to tempfile
         self.prog_file = NamedTemporaryFile(delete=False)
 
@@ -217,14 +216,12 @@ class DynamicLogicProgramText(DynamicLogicProgram):
 
         print("DLP: grounding from {} to {}".format(start, end))
 
+        prog_name = "step{}".format(end)
+
         for time, rules in self.grounder.ground_range(start, end).iteritems():
-            prog_name = "step{}".format(time)
             self.control.add(prog_name, [], "\n".join(rules))
 
-        for time in range(start, end+1):
-            #print("adding rules for step: ", str(time))
-            prog_name = "step{}".format(time)
-            self.control.ground([(prog_name, [])])
+        self.control.ground([(prog_name, [])])
 
     def assign_external(self, external, val):
         #print("assigning external: ", str(external), str(val))
@@ -331,7 +328,7 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
 
 
 if __name__ == "__main__":
-    g = Grounder(["basic.lp", "ins2.lp"], "times.lp")
+    g = Grounder(["basic.lp", "ins2.lp"])
     g.parse_prog()
 
     g.ground_to_file(1, 3)
