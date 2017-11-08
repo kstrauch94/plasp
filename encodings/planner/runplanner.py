@@ -46,6 +46,17 @@ M           = "M"
 MP          = "Mp"
 MPC         = "MpC"
 
+#DLPs
+DLP_BASIC   = "basic"
+DLP_TEXT    = "text"
+DLP_BACKEND = "backend"
+DLP_BACKEND_SIMPLIFIED = "backend-simplified"
+
+#DLP encodings
+
+DLP_BASIC_ENCODING = "basic.lp" # or strips inc?
+DLP_TEXT_ENCODING  = "basic-text.lp"
+DLP_BACKEND_ENCODING = "basic-backend.lp"
 
 
 class MyArgumentParser:
@@ -113,6 +124,8 @@ Get help/report bugs via : https://potassco.org/support
         extended.add_argument('--madagascar-M',  dest='M',  action='store_true',help='Run version   M of madagascar SAT planner')
         extended.add_argument('--madagascar-Mp', dest='Mp', action='store_true',help='Run version  Mp of madagascar SAT planner')
         extended.add_argument('--madagascar-MpC',dest='MpC',action='store_true',help='Run version MpC of madagascar SAT planner')
+
+        extended.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED], help='Use the specified DLP with its apropriate encoding')
 
         # parse
         options, unknown = cmd_parser.parse_known_args()
@@ -237,6 +250,17 @@ def run():
             FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS,BASIC_EXT,test,heuristic," ".join(rest) +
                (postprocess if options['postprocess'] else "")
         )
+    elif options["dlp"] is not None:
+        if options["dlp"] == DLP_TEXT:
+            encoding = DLP_TEXT_ENCODING 
+        elif options["dlp"] == DLP_BACKEND or options["dlp"] == DLP_BACKEND_SIMPLIFIED:
+            encoding = DLP_BACKEND_ENCODING
+        dlp_option = "--dlp={}".format(options["dlp"])
+
+        call = "{} {} {}; {} {} | {} - {} {} {} {} {}".format(
+        FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS+" "+dlp_option,encoding,test,heuristic," ".join(rest) +
+           (postprocess if options['postprocess'] else "")
+    )
     # fast-downward
     elif options['fast-downward']:
         call = "{} {} {} {}".format(FAST_D,domain,instance," ".join(rest))
