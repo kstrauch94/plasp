@@ -670,6 +670,14 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
+
+        # set solving and restart policy
+        if 'restarts_per_solve' in options:
+            self.control.configuration.solve.solve_limit = "umax," + str(options['restarts_per_solve'])
+
+        if 'conflicts_per_restart' in options:
+            if int(options['conflicts_per_restart']) != 0:
+                self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
     
     def get_generator_class(self):
         return DLPGenerator
@@ -711,23 +719,24 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
                 self.assigned_externals[(step, symbol)] = -1
 
     def assign_external(self, clingo_symbol, value):
-        print(type(clingo_symbol.arguments[0].number))
         if len(clingo_symbol.arguments) != 1:
             print("ERROR:Clingo symbol must have one int argument!")
             raise ValueError
         step = int(clingo_symbol.arguments[-1].number)
-        symbol = clingo_symbol.name
+        symbol = clingo.Function(clingo_symbol.name, clingo_symbol.arguments[:-1])
         if value is None:
             self.assigned_externals.pop((step, symbol), None)
         else:
             self.assigned_externals[(step, symbol)] = 1 if value else -1
 
     def release_external(self, clingo_symbol):
-        if len(clingo_symbol.arguments) != 1 or not isinstance(clingo_symbol.arguments[0],int):
-            raise Error
-        step = clingo_symbol.arguments[-1]
-        symbol = clingo_symbol.name
+        if len(clingo_symbol.arguments) != 1:
+            print("ERROR:Clingo symbol must have one int argument!")
+            raise ValueError
+        step = int(clingo_symbol.arguments[-1].number)
+        symbol = clingo.Function(clingo_symbol.name, clingo_symbol.arguments[:-1])
         self.assigned_externals.pop((step, symbol), None)
+        print(self.normal_externals)
         self.backend.add_rule(
             [], [self.normal_externals[symbol]+(step*self.offset)], False
         )
@@ -741,8 +750,14 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         return out
 
     def get_assumptions(self):
-        return [(self.normal_externals[key[1]]+(self.offset*key[0])*value)
+        for key, value in self.assigned_externals.items():
+            print("assumptions: ", key, value)
+        
+        a = [(self.normal_externals[key[1]]+(self.offset*key[0])*value)
                 for key, value in self.assigned_externals.items()]
+
+        print("assumptions returned: ", a)
+        return a
 
     def cleanup(self):
         self.control.cleanup()
@@ -757,7 +772,11 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
     @property
     def ground_time(self):
         return 0
-
+    
+    def print_model(self, m, step):
+        print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
+                    ["{}:{}".format(x,y) for x,y in self.get_answer(m, step)]
+                )))
 
     def __str__(self):
         out = ""
@@ -817,7 +836,7 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         return out
 
 
-class DynamicLogicProgramBackendSimplified:
+class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
 
     def __init__(self, files, program="", options=[], clingo_options=[]):
 
@@ -877,15 +896,18 @@ def incmode():
     #print(dlp); return
     """
 
-    dlp = DynamicLogicProgramBackend(["example.lp"])    
+    dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
+    dlp.start()
+    #print(dlp); return
 
     # loop
     step, ret = 1, None
     while True:
-        dlp.release_external(step-1, clingo.Function("last",[]))
+        #if step == 2: return
+        dlp.release_external(clingo.Function("query",[step-1]))
         dlp.ground(1)
-        dlp.assign_external(step, clingo.Function("last",[]), True)
-        with dlp.control.solve(assumptions = dlp.get_assumptions(), yield_ = True) as handle:
+        dlp.assign_external(clingo.Function("query",[step]), True)
+        with dlp.control.solve(assumptions=dlp.get_assumptions(), yield_ = True) as handle:
             for m in handle:
                 print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
                     ["{}:{}".format(x,y) for x,y in dlp.get_answer(m, step)]
