@@ -248,6 +248,11 @@ class DynamicLogicProgramText(DynamicLogicProgram):
     def ground_time(self):
         return self.grounder.grounding_time
 
+    def print_model(self, m, step):
+
+        for atom in m.symbols(shown=True):
+            print atom
+
     def __str__(self):
         return self.grounder.__str__()
 
@@ -324,6 +329,11 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
     @property
     def statistics(self):
         return self.control.statistics
+
+    def print_model(self, m, step):
+
+        for atom in m.symbols(shown=True):
+            print atom
 
 
 
