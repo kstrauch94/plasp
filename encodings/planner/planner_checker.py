@@ -481,6 +481,7 @@ class SolverDLP:
             self.__shown = shown
         else:
             self.__print_model(shown)
+            self.__dlp.print_model(m, self.__length)
 
     # to get rid of clingo error when using the tester
     def get_shown(self):
@@ -548,7 +549,8 @@ class SolverDLP:
             self.__dlp.cleanup()
             grounded      = length - self.__length
             self.__length = length
-
+        
+        """
         # blocking or unblocking actions
         if length < self.__last_length:
             log("Blocking actions...")
@@ -558,6 +560,7 @@ class SolverDLP:
             log("Unblocking actions...")
             for t in range(self.__last_length+1, length+1):
                 self.__dlp.assign_external(clingo.Function(SKIP,[t]), False)
+        """
 
         # solve
         log("Solving...", PRINT)
@@ -629,14 +632,13 @@ class Planner:
             program += FORBID_ACTIONS_PROGRAM
         if options['force_actions']:  
             program += FORCE_ACTIONS_PROGRAM
-        
+
         if options["dlp"] is None:
             dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
         elif options["dlp"] == DLP_TEXT:
             dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
         elif options["dlp"] == DLP_BACKEND:
             dlp = temporal.DynamicLogicProgramBackend(files, program, options, clingo_options)
-            print(dlp)
         elif options["dlp"] == DLP_BACKEND_SIMPLIFIED:
             dlp = temporal.DynamicLogicProgramBackendSimplified(files, program, options, clingo_options)
 
