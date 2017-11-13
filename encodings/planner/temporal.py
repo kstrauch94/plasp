@@ -736,7 +736,6 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         step = int(clingo_symbol.arguments[-1].number)
         symbol = clingo.Function(clingo_symbol.name, clingo_symbol.arguments[:-1])
         self.assigned_externals.pop((step, symbol), None)
-        print(self.normal_externals)
         self.backend.add_rule(
             [], [self.normal_externals[symbol]+(step*self.offset)], False
         )
@@ -750,14 +749,9 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         return out
 
     def get_assumptions(self):
-        for key, value in self.assigned_externals.items():
-            print("assumptions: ", key, value)
         
-        a = [(self.normal_externals[key[1]]+(self.offset*key[0])*value)
+        return [(self.normal_externals[key[1]]+(self.offset*key[0])*value)
                 for key, value in self.assigned_externals.items()]
-
-        print("assumptions returned: ", a)
-        return a
 
     def cleanup(self):
         self.control.cleanup()
