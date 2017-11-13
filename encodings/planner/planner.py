@@ -675,7 +675,6 @@ class Planner:
                 log("PLAN NOT FOUND",PRINT)
                 break  
             result = solver.solve(length)
-            print(length, result)
             if result != NO_MEM and length > max_length:
                 max_length = length
             if result == SATISFIABLE:
