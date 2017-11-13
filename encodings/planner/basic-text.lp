@@ -37,6 +37,3 @@ init(holds(X,V,T-1)) :- initialState(X,V), time(T).
 goal(T) :- holds(X,V,T) : goal(X,V); time(T).
 :- not goal(T), query(T).
 #show occurs/2.
-%#show holds/3.
-#show goal/1.
-#show query/1.
