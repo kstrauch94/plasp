@@ -640,7 +640,6 @@ class DynamicLogicProgramContainer:
 class DynamicLogicProgramBackend(DynamicLogicProgram):
 
     def __init__(self, files, program="", options=[], clingo_options=[]):
-        
         # preprocessing
         generator_class = self.get_generator_class()
         generator = generator_class(

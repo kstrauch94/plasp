@@ -1,4 +1,6 @@
 
+#const _parallel = 0.
+
 % Define unsubsumed mutexes
 
 mutex(G,X) :- mutexGroup(G), contains(G,X,V). %, fluent(X,V).
@@ -37,3 +39,7 @@ init(holds(X,V,T-1)) :- initialState(X,V), time(T).
 goal(T) :- holds(X,V,T) : goal(X,V); time(T).
 :- not goal(T), query(T).
 #show occurs/2.
+
+% _parallel = 5
+:- 2 { occurs(A,T) },                       _parallel = 5.
+

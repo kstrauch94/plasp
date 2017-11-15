@@ -1,3 +1,5 @@
+#const _parallel = 0.
+
 #program base. % as strips-incremental.lp
 
 % Define unsubsumed mutexes
@@ -43,3 +45,7 @@ init(holds(X,V)) :- initialState(X,V). %, fluent(X).
 
 % NEW: LAST ATOM
 #external query.
+
+% _parallel = 5
+:- 2 { occurs(A) },                       _parallel = 5.
+

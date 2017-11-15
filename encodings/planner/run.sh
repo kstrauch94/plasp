@@ -11,12 +11,12 @@ INSTANCE4=ins3.lp
 INSTANCE5=/home/klaus/Desktop/Work/Efficient-grounding/benchmarks/instances-easy/ipc-2000/domains/blocks-strips-typed/instances/instance-12.pddl
 
 # test
-#python -B runplanner.py $INSTANCE1 --translate --parallel=0 
+#python -B runplanner.py $INSTANCE1 --translate --parallel=5
 
 # text DLP
-#python -B runplanner.py $INSTANCE2 --translate --dlp=text
+#python -B runplanner.py $INSTANCE2 --translate --dlp=text --parallel=5
 # text DLP
-#python -B runplanner.py $INSTANCE1 --translate --dlp=backend
+python -B runplanner.py $INSTANCE1 --translate --dlp=backend --parallel=5
 # text DLP
 #python -B runplanner.py $INSTANCE5 --translate --dlp=backend-simplified
 

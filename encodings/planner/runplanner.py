@@ -291,9 +291,12 @@ def run():
         elif options["dlp"] == DLP_BACKEND or options["dlp"] == DLP_BACKEND_SIMPLIFIED:
             encoding = DLP_BACKEND_ENCODING
         dlp_option = "--dlp={}".format(options["dlp"])
+        parallel_options = " -c _parallel={} ".format(options['parallel'])
+        
+        other_options_str = " ".join([dlp_option, parallel_options])
 
         call = "{} {} {}; {} {} | {} - {} {} {} {} {}".format(
-        FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS+" "+dlp_option,encoding,test,heuristic," ".join(rest) +
+        FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS+other_options_str,encoding,test,heuristic," ".join(rest) +
            (postprocess if options['postprocess'] else "")
     )
 
