@@ -285,11 +285,6 @@ def run():
                (postprocess if options['postprocess'] else "")
         )
 
-    elif options['basic-ext']:
-        call = "{} {} {}; {} {} | {} - {} {} {} {} {}".format(
-            FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS,BASIC_EXT,test,heuristic," ".join(rest) +
-               (postprocess if options['postprocess'] else "")
-        )
     elif options["dlp"] is not None:
         if options["dlp"] == DLP_TEXT:
             encoding = DLP_TEXT_ENCODING 
