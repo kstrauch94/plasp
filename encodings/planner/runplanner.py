@@ -96,7 +96,7 @@ Get help/report bugs via : https://potassco.org/support
         normal.add_argument('--redundancy',action='store_true',help='Enforcement of redundant actions')
         normal.add_argument('--postprocess',action='store_true',help='Solve, serialize, and check if solution is correct (works also with --basic)')
         normal.add_argument('--preprocess-simple',action='store_true',help='Use simple preprocessing encoding')
-        normal.add_argument('--heuristic',action='store_true',help='Run domain heuristic for planning')
+        normal.add_argument('--use-heuristic', dest='use_heuristic', action='store_true',help='Run domain heuristic for planning')
         normal.add_argument('--test',default=None, type=int, choices=[0,1],
                             help="Test solution (0) using all non-serializable actions, or (1) using a minimal subset of them")
         normal.add_argument('--test-add', dest="test_add", default=5, type=int, choices=[0,1,2,3,4,5],
@@ -235,7 +235,7 @@ def run():
 
     # heuristic
     heuristic = ""
-    if options['heuristic']:
+    if options['use_heuristic']:
         heuristic = " --heuristic=Domain {} ".format(HEURISTIC)
 
     # preprocess
