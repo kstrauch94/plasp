@@ -642,6 +642,7 @@ class Planner:
         elif options["dlp"] == DLP_BACKEND_SIMPLIFIED:
             dlp = temporal.DynamicLogicProgramBackendSimplified(files, program, options, clingo_options)
 
+
         dlp.start()
 
         dlp.assign_external(clingo.Function(QUERY,[0]), True)
@@ -725,7 +726,6 @@ class Planner:
             if options['test']:
                 log("Models       : {}".format(solver.get_models()), PRINT)
             log("",PRINT)
-
 
 
 #
@@ -833,6 +833,7 @@ Get help/report bugs via : https://potassco.org/support
             '--force-actions',dest='force_actions',action="store_true",
             help="Force at least one action at time points before current plan length"
         )
+
         solving.add_argument(
             '--check-at-last',dest='check_at_last',action="store_true",
             help="Ground check program only for the current latest time point"

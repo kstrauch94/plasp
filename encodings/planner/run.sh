@@ -15,4 +15,6 @@ python -B runplanner.py $INSTANCE1 --translate --parallel=0
 # text DLP
 #python -B runplanner.py $INSTANCE1 --dlp=text
 
+#python runplanner.py $INSTANCE1 --translate --parallel=0 --heuristic=Domain heuristic.lp --verbose
+#python planner.py --forbid-actions $INSTANCE4 basic.lp --verbose #--output-debug=text
 
