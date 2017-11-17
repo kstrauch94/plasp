@@ -713,7 +713,8 @@ class Planner:
         # stats
 
         log("\n" + clingo_stats.Stats().summary(dlp.control),PRINT)
-        log("\nDLP grounding time: " + str(dlp.ground_time), PRINT)
+        log("\nDLP grounding time: {}".format(dlp.ground_time), PRINT)
+        log("\nSteps in solution: {}".format(sol_length)
         if options['stats']:
             log(clingo_stats.Stats().statistics(dlp.control),PRINT)
             # peak memory
