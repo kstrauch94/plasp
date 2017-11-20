@@ -4,7 +4,7 @@ from __future__ import print_function
 import clingo
 import sys
 from collections import namedtuple
-from time import clock
+from time import clock, time
 from math import copysign
 
 
@@ -189,10 +189,10 @@ class DLPGenerator:
         ]
 
     def set_init(self):
-        try:
-            self.do_set_init()
-        except Exception:
-            raise Exception(INIT_INCORRECT)
+        #try:
+        self.do_set_init()
+        #except Exception:
+        #    raise Exception(INIT_INCORRECT)
 
     #
     # observer
@@ -640,6 +640,9 @@ class DynamicLogicProgramContainer:
 class DynamicLogicProgramBackend(DynamicLogicProgram):
 
     def __init__(self, files, program="", options=[], clingo_options=[]):
+
+        t = time()
+
         # preprocessing
         generator_class = self.get_generator_class()
         generator = generator_class(
@@ -677,18 +680,29 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         if 'conflicts_per_restart' in options:
             if int(options['conflicts_per_restart']) != 0:
                 self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
+
+        self._init_time = time() - t
+        self._start_time = 0
+        self._ground_time = 0
     
     def get_generator_class(self):
         return DLPGenerator
 
     def start(self):
 
+        t = time()
+
         for atom in self.init:
             self.backend.add_rule([atom], [], False)
+
+        self._start_time = time() - t
 
     # ground(n) grounds n steps
     # ground(i,j) grounds from i to j (both included)
     def ground(self, start, end=None):
+        
+        t = time()
+
         # preprocess
         if end == None:
             end = self.steps + start
@@ -716,6 +730,8 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
                 )
             for symbol in self.normal_externals.keys():
                 self.assigned_externals[(step, symbol)] = -1
+
+        self._ground_time += time() - t
 
     def assign_external(self, clingo_symbol, value):
         if len(clingo_symbol.arguments) != 1:
@@ -764,7 +780,7 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
 
     @property
     def ground_time(self):
-        return 0
+        return self._init_time, self._start_time, self._ground_time
     
     def print_model(self, m, step):
         print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
@@ -833,6 +849,51 @@ class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
 
     def __init__(self, files, program="", options=[], clingo_options=[]):
 
+        t = time()
+
+        # preprocessing
+        generator_class = self.get_generator_class()
+        generator = generator_class(
+            files = files,
+            adds  = [("base", [], program)],
+            parts = [("base", [])],
+            options = clingo_options,
+            compute_cautious = True,
+            compute_brave = True
+        )
+
+        # start
+        dlp_container = generator.run()
+
+
+        # init
+        self.offset = dlp_container.offset
+        self.rules = dlp_container.rules
+        self.weight_rules = dlp_container.weight_rules
+        self.primed_externals = dlp_container.primed_externals
+        self.normal_externals = dlp_container.normal_externals
+        self.output = dlp_container.output
+        self.output_facts = dlp_container.output_facts
+        self.init = dlp_container.init
+        # rest
+        self.control = clingo.Control(clingo_options)
+        self.backend = self.control.backend
+        self.steps = 0
+        self.assigned_externals = {}
+
+        self._init_time = time() - t
+        self._start_time = 0
+        self._ground_time = 0
+    
+    def get_generator_class(self):
+        return DLPGeneratorSimplifier
+
+class DynamicLogicProgramBackendSimplified_NCNB(DynamicLogicProgramBackend):
+
+    def __init__(self, files, program="", options=[], clingo_options=[]):
+
+        t = time()
+
         # preprocessing
         generator_class = self.get_generator_class()
         generator = generator_class(
@@ -862,6 +923,10 @@ class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
         self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
+
+        self._init_time = time() - t
+        self._start_time = 0
+        self._ground_time = 0
     
     def get_generator_class(self):
         return DLPGeneratorSimplifier

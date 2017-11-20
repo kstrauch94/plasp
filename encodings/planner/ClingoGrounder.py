@@ -172,6 +172,8 @@ class DynamicLogicProgramText(DynamicLogicProgram):
 
     def __init__(self, files, program="", options={}, clingo_options=[]):
 
+        t = timemodule.time()
+
         self.grounder = Grounder(files=files, program=program)
 
         self.control = clingo.Control(clingo_options)
@@ -186,7 +188,14 @@ class DynamicLogicProgramText(DynamicLogicProgram):
             if int(options['conflicts_per_restart']) != 0:
                 self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
 
+        self._init_time = timemodule.time() - t
+
+        self._start_time = 0
+        self._ground_time = 0
+
     def start(self):
+
+        t = timemodule.time()
 
         self.grounder.parse_prog()
 
@@ -203,9 +212,15 @@ class DynamicLogicProgramText(DynamicLogicProgram):
 
         self.control.ground([("base", [])])
 
+        self._start_time += timemodule.time() - t
+    
+
     # ground(n) grounds n steps
     # ground(i,j) grounds from i to j (both included)
     def ground(self, start, end=None):
+
+        t = timemodule.time()
+
         # preprocess
         if end == None:
             end = self.step + start
@@ -222,6 +237,8 @@ class DynamicLogicProgramText(DynamicLogicProgram):
             self.control.add(prog_name, [], "\n".join(rules))
 
         self.control.ground([(prog_name, [])])
+
+        self._ground_time += timemodule.time() - t
 
     def assign_external(self, external, val):
         #print("assigning external: ", str(external), str(val))
@@ -246,7 +263,7 @@ class DynamicLogicProgramText(DynamicLogicProgram):
 
     @property
     def ground_time(self):
-        return self.grounder.grounding_time
+        return self._init_time, self._start_time, self._ground_time
 
     def print_model(self, m, step):
 
@@ -266,6 +283,8 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
 
     def __init__(self, files, program="", options=[], clingo_options=[]):
 
+        t = timemodule.time()
+
         self.control = clingo.Control(clingo_options)
 
         for f in files:
@@ -284,13 +303,23 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
             if int(options['conflicts_per_restart']) != 0:
                 self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
 
+        self._init_time = timemodule.time() -t
+        self._start_time = 0
+        self._ground_time = 0
+
     def start(self):
+        t = timemodule.time()
 
         self.control.ground([(BASE, []), (CHECK, [0])])
+
+        self._start_time = timemodule.time() - t
 
     # ground(n) grounds n steps
     # ground(i,j) grounds from i to j (both included)
     def ground(self, start, end=None):
+
+        t = timemodule.time()
+
         # preprocess
         if end == None:
             end = self.step + start
@@ -306,6 +335,8 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
         parts += [(CHECK, [t]) for t in range(start, end+1)]
 
         self.control.ground(parts)
+
+        self._ground_time += timemodule.time() - t
 
     def assign_external(self, external, val):
         self.control.assign_external(external, val)
@@ -324,7 +355,7 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
 
     @property
     def ground_time(self):
-        return 0
+        return self._init_time, self._start_time, self._ground_time
 
     @property
     def statistics(self):
