@@ -148,7 +148,7 @@ def run():
             domain = os.path.dirname(os.path.realpath(instance)) + "/../domain.pddl"
 
     if not os.path.isfile(domain):
-        print "Domain File not found"
+        print("Domain File not found")
         return
 
     #
@@ -284,7 +284,7 @@ def run():
     #
 
     if options['print']:
-        print call
+        print(call)
     else:
         os.system(call)
 
