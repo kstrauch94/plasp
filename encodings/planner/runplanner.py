@@ -285,10 +285,14 @@ def run():
 
     if options['print']:
         print(call)
+        exitCode = 0
     else:
-        os.system(call)
+        # the first 8 bits are reserved by the system, so the actual exit code is obtained by shifting by 8 bits
+        exitCode = os.system(call) >> 8
 
     if options['hack']:
         os.system('echo "a." | clingo --stats -')
+
+    sys.exit(exitCode)
 
 run()
