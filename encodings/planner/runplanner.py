@@ -157,7 +157,7 @@ def run():
 
     # translate to facts
     if options['translate']:
-        call = "{} {} {}; {} {}".format(FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT)
+        call = "{} {} {} && {} {}".format(FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT)
     else:
         call = "{} {} {}".format(PLASP,domain,instance)
 
@@ -165,9 +165,9 @@ def run():
     postprocess = ""
     if options['postprocess']:
         if options['translate'] or options['basic']:
-            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {}; {} {}    | clingo - {} {}; rm {}".format(TMP,PLASP,     SAS_OUTPUT,POSTPROCESS,TMP,TMP)
+            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {} && {} {}    | clingo - {} {} && rm {}".format(TMP,PLASP,     SAS_OUTPUT,POSTPROCESS,TMP,TMP)
         else:
-            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {}; {} {} {} | clingo - {} {}; rm {}".format(TMP,PLASP,instance,domain,POSTPROCESS,TMP,TMP)
+            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {} && {} {} {} | clingo - {} {} && rm {}".format(TMP,PLASP,instance,domain,POSTPROCESS,TMP,TMP)
 
     # generate and test
     test = ""
@@ -264,7 +264,7 @@ def run():
         call = call.replace(PLANNER,CLINGO + " " + INCMODE)
         call = call.replace(BASIC_OPTIONS,"")
     elif options['basic']:
-        call = "{} {} {}; {} {} | {} - {} {} {} {} {}".format(
+        call = "{} {} {} && {} {} | {} - {} {} {} {} {}".format(
             FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS,BASIC,test,heuristic," ".join(rest) +
                (postprocess if options['postprocess'] else "")
         )
