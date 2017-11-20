@@ -352,26 +352,40 @@ STEP  = "step"
 CHECK = "check"
 QUERY = "query"
 SKIP  = "skip"
-EXTERNALS_PROGRAM  = """
+EXTERNALS_PROGRAM_BASIC  = """
 #program step(t).  #external skip(t).
-#program check(t). #external query(t).
 """
-FORBID_ACTIONS_PROGRAM = """
+EXTERNALS_PROGRAM_TEXT  = """
+#external skip(T) : time(T).
+#external skip(0).
+"""
+EXTERNALS_PROGRAM_BACKEND  = """
+#external skip.
+"""
+
+FORBID_ACTIONS_PROGRAM_BASIC = """
 #program step(t).
 :-     occurs(A,t),     skip(t). % no action
 """
-FORCE_ACTIONS_PROGRAM = """
+FORBID_ACTIONS_PROGRAM_TEXT = """
+:-     occurs(A,T),     skip(T). % no action
+"""
+FORBID_ACTIONS_PROGRAM_BACKEND = """
+:-     occurs(A),     skip. % no action
+"""
+
+FORCE_ACTIONS_PROGRAM_BASIC = """
 #program step(t).
-:- not occurs(A,t):action(A); not skip(t). % some actiont 
+:- not occurs(_,t), not skip(t). % some actiont 
 """
-FORCE_ACTIONS_PROGRAM_NEW = """
-%someactionat(t) :- occurs(A,t).
-%:- not someactionat(t), not skip(t).
+FORCE_ACTIONS_PROGRAM_TEXT = """
+someactionat(T) :- occurs(A,T).
+:- not someactionat(T), not skip(T), time(T). % some actiont 
 """
-FORCE_ACTIONS_PROGRAM_OLD = """
-#program step(t).
-:- not occurs(_,t), not skip(t). % some action
+FORCE_ACTIONS_PROGRAM_BACKEND = """
+:- not occurs(_), not skip. % some actiont 
 """
+
 BLOCK_BASE = "block_base"   # block_base
 BLOCK_STEP = "block_step"   # block_step(t)
 BLOCK_MODEL = "block_model" # block_model(m,length)
@@ -550,7 +564,7 @@ class SolverDLP:
             grounded      = length - self.__length
             self.__length = length
         
-        """
+        
         # blocking or unblocking actions
         if length < self.__last_length:
             log("Blocking actions...")
@@ -560,7 +574,7 @@ class SolverDLP:
             log("Unblocking actions...")
             for t in range(self.__last_length+1, length+1):
                 self.__dlp.assign_external(clingo.Function(SKIP,[t]), False)
-        """
+        
 
         # solve
         log("Solving...", PRINT)
@@ -625,23 +639,66 @@ class Planner:
         
         # additional programs
 
-        program += EXTERNALS_PROGRAM
-        if options['test']:
-            program += TEST_NO_WARNING
-        if options['forbid_actions']: 
-            program += FORBID_ACTIONS_PROGRAM
-        if options['force_actions']:  
-            program += FORCE_ACTIONS_PROGRAM
 
         if options["dlp"] is None:
+
+            program += EXTERNALS_PROGRAM_BASIC
+            if options['test']:
+                program += TEST_NO_WARNING
+            if options['forbid_actions']: 
+                program += FORBID_ACTIONS_PROGRAM_BASIC
+            if options['force_actions']:  
+                program += FORCE_ACTIONS_PROGRAM_BASIC
+
             dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+
         elif options["dlp"] == DLP_TEXT:
+
+            program += EXTERNALS_PROGRAM_TEXT
+            if options['test']:
+                program += TEST_NO_WARNING
+            if options['forbid_actions']: 
+                program += FORBID_ACTIONS_PROGRAM_TEXT
+            if options['force_actions']:  
+                program += FORCE_ACTIONS_PROGRAM_TEXT
+
             dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
+
         elif options["dlp"] == DLP_BACKEND:
+
+            program += EXTERNALS_PROGRAM_BACKEND
+            if options['test']:
+                program += TEST_NO_WARNING
+            if options['forbid_actions']: 
+                program += FORBID_ACTIONS_PROGRAM_BACKEND
+            if options['force_actions']:  
+                program += FORCE_ACTIONS_PROGRAM_BACKEND
+
             dlp = temporal.DynamicLogicProgramBackend(files, program, options, clingo_options)
+
         elif options["dlp"] == DLP_BACKEND_SIMPLIFIED:
+
+            program += EXTERNALS_PROGRAM_BACKEND
+            if options['test']:
+                program += TEST_NO_WARNING
+            if options['forbid_actions']: 
+                program += FORBID_ACTIONS_PROGRAM_BACKEND
+            if options['force_actions']:  
+                program += FORCE_ACTIONS_PROGRAM_BACKEND
+
             dlp = temporal.DynamicLogicProgramBackendSimplified(files, program, options, clingo_options)
 
+        elif options["dlp"] == DLP_BACKEND_SIMPLIFIED_NCNB:
+
+            program += EXTERNALS_PROGRAM_BACKEND
+            if options['test']:
+                program += TEST_NO_WARNING
+            if options['forbid_actions']: 
+                program += FORBID_ACTIONS_PROGRAM_BACKEND
+            if options['force_actions']:  
+                program += FORCE_ACTIONS_PROGRAM_BACKEND
+
+            dlp = temporal.DynamicLogicProgramBackendSimplified_NCNB(files, program, options, clingo_options)
 
         dlp.start()
 
@@ -712,9 +769,13 @@ class Planner:
 
         # stats
 
+        init_time, start_time, ground_time = dlp.ground_time    
+
         log("\n" + clingo_stats.Stats().summary(dlp.control),PRINT)
-        log("\nDLP grounding time: {}".format(dlp.ground_time), PRINT)
-        log("\nSteps in solution: {}".format(sol_length)
+        log("\nDLP init time: {}".format(init_time), PRINT)
+        log("\nDLP start time: {}".format(start_time), PRINT)
+        log("\nDLP ground time: {}".format(ground_time), PRINT)
+        log("\nSteps in solution: {}".format(sol_length), PRINT)
         if options['stats']:
             log(clingo_stats.Stats().statistics(dlp.control),PRINT)
             # peak memory
@@ -740,6 +801,7 @@ DLP_BASIC   = "basic"
 DLP_TEXT    = "text"
 DLP_BACKEND = "backend"
 DLP_BACKEND_SIMPLIFIED = "backend-simplified"
+DLP_BACKEND_SIMPLIFIED_NCNB = "backend-simplified-ncnb"
 
 #DLP encodings
 
@@ -840,7 +902,7 @@ Get help/report bugs via : https://potassco.org/support
             help="Ground check program only for the current latest time point"
         )
 
-        solving.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED],
+        solving.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED, DLP_BACKEND_SIMPLIFIED_NCNB],
             help='Use the specified DLP with its apropriate encoding')
 
         # Scheduler

@@ -57,6 +57,7 @@ DLP_BASIC   = "basic"
 DLP_TEXT    = "text"
 DLP_BACKEND = "backend"
 DLP_BACKEND_SIMPLIFIED = "backend-simplified"
+DLP_BACKEND_SIMPLIFIED_NCNB = "backend-simplified-ncnb"
 
 #DLP encodings
 
@@ -132,7 +133,7 @@ Get help/report bugs via : https://potassco.org/support
         extended.add_argument('--madagascar-Mp', dest='Mp', action='store_true',help='Run version  Mp of madagascar SAT planner')
         extended.add_argument('--madagascar-MpC',dest='MpC',action='store_true',help='Run version MpC of madagascar SAT planner')
 
-        extended.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED], help='Use the specified DLP with its apropriate encoding')
+        extended.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED, DLP_BACKEND_SIMPLIFIED_NCNB], help='Use the specified DLP with its apropriate encoding')
 
         # parse
         options, unknown = cmd_parser.parse_known_args()
@@ -288,12 +289,12 @@ def run():
     elif options["dlp"] is not None:
         if options["dlp"] == DLP_TEXT:
             encoding = DLP_TEXT_ENCODING 
-        elif options["dlp"] == DLP_BACKEND or options["dlp"] == DLP_BACKEND_SIMPLIFIED:
+        elif options["dlp"] == DLP_BACKEND or options["dlp"] == DLP_BACKEND_SIMPLIFIED or options["dlp"] == DLP_BACKEND_SIMPLIFIED_NCNB:
             encoding = DLP_BACKEND_ENCODING
         dlp_option = "--dlp={}".format(options["dlp"])
         parallel_options = " -c _parallel={} ".format(options['parallel'])
-        
-        other_options_str = " ".join([dlp_option, parallel_options])
+        shallow_option = " -c _shallow=1 " if options['shallow'] else ""
+        other_options_str = " ".join([dlp_option, parallel_options, shallow_option])
 
         call = "{} {} {}; {} {} | {} - {} {} {} {} {}".format(
         FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS+other_options_str,encoding,test,heuristic," ".join(rest) +
