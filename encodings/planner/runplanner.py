@@ -79,7 +79,8 @@ Get help/report bugs via : https://potassco.org/support
         # basic
         basic = cmd_parser.add_argument_group('Basic Options')
         basic.add_argument('-h','--help',action='help',help='Print help and exit')
-        basic.add_argument('-p','--print',dest='print',action='store_true',help='Print system call and exit')
+        basic.add_argument('--dry-run',dest='dry_run',action='store_true',help='Print system call without running the planner')
+        basic.add_argument('-p','--print-call',dest='print_call',action='store_true',help='Print system call before running the planner')
         #basic.add_argument('-',dest='read_stdin',action='store_true',help=argparse.SUPPRESS)
         #basic.add_argument('-c','--const',dest='constants',action="append",help=argparse.SUPPRESS,default=[])
         #basic.add_argument('-v','--verbose',dest='verbose',action="store_true",help="Be a bit more verbose")
@@ -283,8 +284,10 @@ def run():
     # SOLVE
     #
 
-    if options['print']:
-        print(call)
+    if options['print_call'] or options['dry_run']:
+        print("# planner call: " + call, file = sys.stderr)
+
+    if options['dry_run']:
         exitCode = 0
     else:
         # the first 8 bits are reserved by the system, so the actual exit code is obtained by shifting by 8 bits
