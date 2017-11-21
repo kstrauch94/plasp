@@ -3,52 +3,52 @@ import sys
 import os
 import argparse
 
-PLASP         = "plasp"
-PLASP_DIR     = os.path.dirname(os.path.realpath(__file__)) + "/../../"
-PLANNER       = PLASP_DIR + "encodings/planner/planner.py"
-BASIC         = PLASP_DIR + "encodings/planner/basic.lp"
-PRE_SIMPLE    = PLASP_DIR + "encodings/planner/preprocess_simple.lp"
-HEURISTIC     = PLASP_DIR + "encodings/planner/heuristic.lp"
-PREPROCESS    = PLASP_DIR + "encodings/strips/preprocess.lp"
-STRIPS        = PLASP_DIR + "encodings/strips/strips-incremental.lp"
-REDUNDANCY    = PLASP_DIR + "encodings/strips/redundancy.lp"
-POSTPROCESS   = PLASP_DIR + "encodings/strips/postprocess.lp"
-INCMODE       = PLASP_DIR + "encodings/strips/incmode.lp"
-TMP           = os.path.dirname(os.path.realpath(__file__)) + "/run.tmp" + str(os.getpid())
-BASIC_OPTIONS = " --query-at-last --check-at-last --forbid-actions --force-actions -c planner_on=1 "
+from config import *
 
-TEST_FILES    = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_files")
-TEST_FILE     = os.path.join(TEST_FILES,"test.lp")
-TEST_FILE2    = os.path.join(TEST_FILES,"test_const.lp")
-TEST_FILEM    = os.path.join(TEST_FILES,"test_model.lp")
-TEST_MODEL    = os.path.join(TEST_FILES,"block_model.lp")
-TEST_FORALL_1 = os.path.join(TEST_FILES,"block_forall_1.lp")
-TEST_FORALL_T = os.path.join(TEST_FILES,"block_forall_t.lp")
-TEST_B_FALL_1 = os.path.join(TEST_FILES,"block_forall_1_basic.lp")
-TEST_B_FALL_T = os.path.join(TEST_FILES,"block_forall_t_basic.lp")
-TEST_EXISTS_1 = os.path.join(TEST_FILES,"block_exists_1.lp")
-TEST_EXISTS_T = os.path.join(TEST_FILES,"block_exists_t.lp")
-TEST_B_EX_1   = os.path.join(TEST_FILES,"block_exists_1_basic.lp")
-TEST_B_EX_T   = os.path.join(TEST_FILES,"block_exists_t_basic.lp")
-TEST_EDGE_1   = os.path.join(TEST_FILES,"block_exists_edge_1.lp")
-TEST_EDGE_T   = os.path.join(TEST_FILES,"block_exists_edge_t.lp")
-TEST_B_EDGE_1 = os.path.join(TEST_FILES,"block_exists_edge_1_basic.lp")
-TEST_B_EDGE_T = os.path.join(TEST_FILES,"block_exists_edge_t_basic.lp")
-TEST_SEQ_1    = os.path.join(TEST_FILES,"block_sequential_1.lp")
-TEST_SEQ_T    = os.path.join(TEST_FILES,"block_sequential_t.lp")
-TEST_DSEQ_1   = os.path.join(TEST_FILES,"block_dyn_sequential_1.lp")
-TEST_DSEQ_T   = os.path.join(TEST_FILES,"block_dyn_sequential_t.lp")
-TEST_ACT_1    = os.path.join(TEST_FILES,"block_actions_1.lp")
-TEST_ACT_T    = os.path.join(TEST_FILES,"block_actions_t.lp")
+PLASP         = configuration["executables"]["plaspTranslate"]["command"]
+PLANNER       = os.path.join(configuration["executables"]["planner"]["directory"], configuration["executables"]["planner"]["command"])
+BASIC         = os.path.join(configuration["encodings"]["planner"]["directory"], configuration["encodings"]["planner"]["basic"])
+PRE_SIMPLE    = os.path.join(configuration["encodings"]["planner"]["directory"], configuration["encodings"]["planner"]["preprocessSimple"])
+HEURISTIC     = os.path.join(configuration["encodings"]["planner"]["directory"], configuration["encodings"]["planner"]["heuristic"])
+PREPROCESS    = os.path.join(configuration["encodings"]["strips"]["directory"], configuration["encodings"]["strips"]["preprocess"])
+STRIPS        = os.path.join(configuration["encodings"]["strips"]["directory"], configuration["encodings"]["strips"]["stripsIncremental"])
+REDUNDANCY    = os.path.join(configuration["encodings"]["strips"]["directory"], configuration["encodings"]["strips"]["redundancy"])
+POSTPROCESS   = os.path.join(configuration["encodings"]["strips"]["directory"], configuration["encodings"]["strips"]["postprocess"])
+INCMODE       = os.path.join(configuration["encodings"]["strips"]["directory"], configuration["encodings"]["strips"]["incmode"])
+TMP           = configuration["tmpFile"]
+BASIC_OPTIONS = " " + configuration["basicOptions"] + " "
+
+TEST_FILE     = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["test"])
+TEST_FILE2    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["test_const"])
+TEST_FILEM    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["test_model"])
+TEST_MODEL    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_model"])
+TEST_FORALL_1 = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_forall_1"])
+TEST_FORALL_T = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_forall_t"])
+TEST_B_FALL_1 = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_forall_1_basic"])
+TEST_B_FALL_T = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_forall_t_basic"])
+TEST_EXISTS_1 = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_1"])
+TEST_EXISTS_T = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_t"])
+TEST_B_EX_1   = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_1_basic"])
+TEST_B_EX_T   = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_t_basic"])
+TEST_EDGE_1   = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_edge_1"])
+TEST_EDGE_T   = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_edge_t"])
+TEST_B_EDGE_1 = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_edge_1_basic"])
+TEST_B_EDGE_T = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_exists_edge_t_basic"])
+TEST_SEQ_1    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_sequential_1"])
+TEST_SEQ_T    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_sequential_t"])
+TEST_DSEQ_1   = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_dyn_sequential_1"])
+TEST_DSEQ_T   = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_dyn_sequential_t"])
+TEST_ACT_1    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_actions_1"])
+TEST_ACT_T    = os.path.join(configuration["testFiles"]["directory"], configuration["testFiles"]["block_actions_t"])
 
 # Other systems
-CLINGO      = "clingo"
-FAST_D      = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --alias seq-sat-lama-2011"
-FAST_D_TR   = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --translate"
+CLINGO      = configuration["executables"]["clingo"]["command"]
+FAST_D      = os.path.join(configuration["executables"]["fastDownward"]["directory"], configuration["executables"]["fastDownward"]["command"])
+FAST_D_TR   = os.path.join(configuration["executables"]["fastDownwardTranslate"]["directory"], configuration["executables"]["fastDownwardTranslate"]["command"])
 SAS_OUTPUT  = "output.sas"
-M           = "M"
-MP          = "Mp"
-MPC         = "MpC"
+M           = configuration["executables"]["madagascarM"]["command"]
+MP          = configuration["executables"]["madagascarMp"]["command"]
+MPC         = configuration["executables"]["madagascarMpC"]["command"]
 
 
 
@@ -79,7 +79,8 @@ Get help/report bugs via : https://potassco.org/support
         # basic
         basic = cmd_parser.add_argument_group('Basic Options')
         basic.add_argument('-h','--help',action='help',help='Print help and exit')
-        basic.add_argument('-p','--print',dest='print',action='store_true',help='Print system call and exit')
+        basic.add_argument('--dry-run',dest='dry_run',action='store_true',help='Print system call without running the planner')
+        basic.add_argument('-p','--print-call',dest='print_call',action='store_true',help='Print system call before running the planner')
         #basic.add_argument('-',dest='read_stdin',action='store_true',help=argparse.SUPPRESS)
         #basic.add_argument('-c','--const',dest='constants',action="append",help=argparse.SUPPRESS,default=[])
         #basic.add_argument('-v','--verbose',dest='verbose',action="store_true",help="Be a bit more verbose")
@@ -148,7 +149,7 @@ def run():
             domain = os.path.dirname(os.path.realpath(instance)) + "/../domain.pddl"
 
     if not os.path.isfile(domain):
-        print "Domain File not found"
+        print("Domain File not found")
         return
 
     #
@@ -157,7 +158,7 @@ def run():
 
     # translate to facts
     if options['translate']:
-        call = "{} {} {}; {} {}".format(FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT)
+        call = "{} {} {} && {} {}".format(FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT)
     else:
         call = "{} {} {}".format(PLASP,domain,instance)
 
@@ -165,9 +166,9 @@ def run():
     postprocess = ""
     if options['postprocess']:
         if options['translate'] or options['basic']:
-            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {}; {} {}    | clingo - {} {}; rm {}".format(TMP,PLASP,     SAS_OUTPUT,POSTPROCESS,TMP,TMP)
+            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {} && {} {}    | clingo - {} {} && rm {}".format(TMP,PLASP,     SAS_OUTPUT,POSTPROCESS,TMP,TMP)
         else:
-            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {}; {} {} {} | clingo - {} {}; rm {}".format(TMP,PLASP,instance,domain,POSTPROCESS,TMP,TMP)
+            postprocess = " --outf=1 | grep -A1 ANSWER | tail -n1 > {} && {} {} {} | clingo - {} {} && rm {}".format(TMP,PLASP,instance,domain,POSTPROCESS,TMP,TMP)
 
     # generate and test
     test = ""
@@ -264,7 +265,7 @@ def run():
         call = call.replace(PLANNER,CLINGO + " " + INCMODE)
         call = call.replace(BASIC_OPTIONS,"")
     elif options['basic']:
-        call = "{} {} {}; {} {} | {} - {} {} {} {} {}".format(
+        call = "{} {} {} && {} {} | {} - {} {} {} {} {}".format(
             FAST_D_TR,domain,instance,PLASP,SAS_OUTPUT,PLANNER,BASIC_OPTIONS,BASIC,test,heuristic," ".join(rest) +
                (postprocess if options['postprocess'] else "")
         )
@@ -283,12 +284,24 @@ def run():
     # SOLVE
     #
 
-    if options['print']:
-        print call
+    if options['print_call'] or options['dry_run']:
+        print("# planner call: " + call, file = sys.stderr)
+
+    if options['dry_run']:
+        exitCode = 0
     else:
-        os.system(call)
+        # the first 8 bits are reserved by the system, so the actual exit code is obtained by shifting by 8 bits
+        exitCode = os.system(call) >> 8
 
     if options['hack']:
         os.system('echo "a." | clingo --stats -')
+
+    # remove output.sas if it has been left over by Fast Downward
+    try:
+        os.remove(SAS_OUTPUT)
+    except OSError:
+        pass
+
+    sys.exit(exitCode)
 
 run()
