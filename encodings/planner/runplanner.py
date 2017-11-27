@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import print_function
 import sys
 import os
 import argparse
@@ -100,7 +101,7 @@ Get help/report bugs via : https://potassco.org/support
         normal.add_argument('--use-heuristic', dest='use_heuristic', action='store_true',help='Run domain heuristic for planning')
         normal.add_argument('--test',default=None, type=int, choices=[0,1],
                             help="Test solution (0) using all non-serializable actions, or (1) using a minimal subset of them")
-        normal.add_argument('--test-add', dest="test_add", default=5, type=int, choices=[0,1,2,3,4,5],
+        normal.add_argument('--test-add', dest="test_add", default=5, type=int, choices=[0,1,2,3,4,5,6,7],
                             help="""Add constraints \
 (0) deleting the model, or \ 
 (1) inforcing forall plans, or \
