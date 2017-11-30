@@ -120,10 +120,11 @@ class A_Scheduler(Scheduler):
             self.__runs.append(current_length)
             self.__runs = self.__runs[1:]
             if len(self.__nomems) == len(self.__runs):
-                self.__nomems = []
+                self.__nomems = set()
                 self.__solver.mem_turn_off()
                 self.__runs = [min(self.__runs)]
                 self.__size = 1
+                self.__length = self.__runs[0]
 
         # not NO_MEM
         else:
@@ -186,7 +187,7 @@ class B_Scheduler:
         self.__nomems           = set()
 
     def next(self, result):
-
+        
         # if not first time
         if not self.__first:
 
@@ -224,10 +225,11 @@ class B_Scheduler:
             # if __next_runs is not empty: add to __runs
             if self.__next_runs != []:
                 if len(self.__nomems) == len(self.__next_runs):
-                    self.__nomems = []
+                    self.__nomems = set()
                     self.__solver.mem_turn_off()
-                    self.__next_runs = self.__next_runs[0:0]
+                    self.__next_runs = [self.__next_runs[0]]
                     self.__size = 1
+                    self.__index = self.__next_runs[0].index + 1
                 first = self.__next_runs[0]
                 first.solve = True
                 self.__runs = [first]
@@ -302,10 +304,11 @@ class C_Scheduler(Scheduler):
             self.__runs.append(self.__runs[0])
             self.__runs = self.__runs[1:]
             if len(self.__nomems) == len(self.__runs):
-                self.__nomems = []
+                self.__nomems = set()
                 self.__solver.mem_turn_off()
                 self.__runs = [min(self.__runs)]
                 self.__size = 1
+                self.__length = self.__runs[0]
 
         # ELSE: add new and handle last
         else:
