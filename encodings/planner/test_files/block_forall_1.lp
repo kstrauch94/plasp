@@ -9,7 +9,7 @@ selfdefeat(A,X) :- active(A), precondition(A,X,V),
 
 _error_at(m,T)   :- _test(_error(A,T),m).
 
-:- occurs(A,T), precondition(A,X,V), not has_condition(A,X,1), not holds(X,V,T).
+:- occurs(A,T), precondition(A,X,V), not has_condition(A,X,1), not holds(X,V,T),
    _error_at(m,T).
 
 single(m,X,T) :- occurs(A,T), selfdefeat(A,X),
