@@ -44,8 +44,9 @@ TEST_ACT_T    = os.path.join(configuration["testFiles"]["directory"], configurat
 
 # Other systems
 CLINGO      = "clingo"
-#FAST_D      = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --alias seq-sat-lama-2011"
-#FAST_D_TR   = "/home/wv/bin/linux/64/fast-downward-data/fast-downward.py --translate"
+#FAST_D      = os.path.join(configuration["executables"]["fastDownward"]["directory"], configuration["executables"]["fastDownward"]["command"])
+#FAST_D_TR   = os.path.join(configuration["executables"]["fastDownwardTranslate"]["directory"], configuration["executables"]["fastDownwardTranslate"]["command"])
+
 FAST_D      = "/home/klaus/bin/Fast-Downward/fast-downward.py --alias seq-sat-lama-2011"
 FAST_D_TR   = "/home/klaus/bin/Fast-Downward/fast-downward.py --translate"
 
