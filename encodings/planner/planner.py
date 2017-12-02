@@ -353,6 +353,7 @@ CHECK = "check"
 QUERY = "query"
 SKIP  = "skip"
 EXTERNALS_PROGRAM_BASIC  = """
+#program check(t). #external query(t).
 #program step(t).  #external skip(t).
 """
 EXTERNALS_PROGRAM_TEXT  = """

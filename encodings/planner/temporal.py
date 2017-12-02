@@ -765,7 +765,7 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
 
     def get_assumptions(self):
         
-        return [(self.normal_externals[key[1]]+(self.offset*key[0])*value)
+        return [(self.normal_externals[key[1]]+(self.offset*key[0]))*value
                 for key, value in self.assigned_externals.items()]
 
     def cleanup(self):
@@ -954,17 +954,19 @@ def incmode():
     #print(dlp); return
     """
 
-    dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
+    #dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
+    dlp = DynamicLogicProgramBackend(["basic-backend-ex.lp"], clingo_options=sys.argv[1:])
     dlp.start()
-    #print(dlp); return
+    print(dlp); return
 
     # loop
     step, ret = 1, None
     while True:
-        #if step == 2: return
+        if step == 3: return
         dlp.release_external(clingo.Function("query",[step-1]))
         dlp.ground(1)
         dlp.assign_external(clingo.Function("query",[step]), True)
+        print(dlp.assigned_externals)
         with dlp.control.solve(assumptions=dlp.get_assumptions(), yield_ = True) as handle:
             for m in handle:
                 print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
