@@ -69,14 +69,10 @@ mutex(G)   :- mutexGroup(G), #count{X : mutex(G,X)} > 1.
 
 % Define initial state
 
-%careful here
-init(holds(X,V)) :- initialState(X,V).%., fluent(X).
+init(holds(X,V)) :- initialState(X,V), fluent(X).
 
 % NEW: GENERATE STATE
 #external holds'(X,V) : contains(X,V).
-
-:- fluent(X), #count{V : holds'(X,V)} > 1.
-:- mutex(G), #count{X,V : holds'(X,V), contains(G,X,V)} > 1.
 
 % STEP PROGRAM
 
