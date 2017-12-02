@@ -318,7 +318,7 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
     # ground(i,j) grounds from i to j (both included)
     def ground(self, start, end=None):
 
-        t = timemodule.time()
+        t1 = timemodule.time()
 
         # preprocess
         if end == None:
@@ -336,7 +336,7 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
 
         self.control.ground(parts)
 
-        self._ground_time += timemodule.time() - t
+        self._ground_time += timemodule.time() - t1 
 
     def assign_external(self, external, val):
         self.control.assign_external(external, val)
