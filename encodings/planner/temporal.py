@@ -299,6 +299,11 @@ class DLPGeneratorSimplifier(DLPGenerator):
 
     def get_consequences(self, opt, true):
         self.ctl.configuration.solve.enum_mode = opt
+        old_restarts = self.ctl.configuration.solve.solve_limit
+        print(old_restarts)
+        self.ctl.configuration.solve.solve_limit = "umax," + "1"
+        print(self.ctl.configuration.solve.solve_limit)
+
         with self.ctl.solve(yield_=True) as handle:
             last = None
             for m in handle:
@@ -309,7 +314,10 @@ class DLPGeneratorSimplifier(DLPGenerator):
                 symbols = last.symbols(shown=True)
             else:
                 symbols = last.symbols(shown=True, complement=True)
-            return [self.ctl.symbolic_atoms[x].literal for x in symbols]
+
+        self.ctl.configuration.solve.restarts = old_restarts
+
+        return [self.ctl.symbolic_atoms[x].literal for x in symbols]
 
     def remove_rule_from_heads(self, rule, atom, weight=False):
         satom = self.satoms[atom]
