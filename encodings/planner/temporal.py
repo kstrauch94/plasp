@@ -30,6 +30,34 @@ def log(*args):
     if log_level == 1:
         print(*args)
 
+#
+# MEMORY USAGE (for Unix)
+#
+import os
+def memory_usage_t(key="VmSize"):
+
+    # data
+    proc_status = '/proc/%d/status' % os.getpid()
+    scale = {'kB': 1024.0, 'mB': 1,
+             'KB': 1024.0, 'MB': 1}
+
+    # get pseudo file  /proc/<pid>/status
+    try:
+        t = open(proc_status)
+        v = t.read()
+        t.close()
+    except:
+        return -1  # non-Linux?
+
+    # get key line e.g. 'VmSize:  9999  kB\n ...'
+    i = v.index(key)
+    v = v[i:].split(None, 3)  # whitespace
+    if len(v) < 3:
+        return -1  # invalid format?
+
+    # return
+    return int(float(v[1]) / scale[v[2]])
+
 
 #
 # Syntax Restriction:
@@ -652,6 +680,9 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         t = time()
 
         # preprocessing
+
+        self.mem = memory_usage_t()
+
         generator_class = self.get_generator_class()
         generator = generator_class(
             files = files,
@@ -665,6 +696,7 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         # start
         dlp_container = generator.run()
 
+        print("mem used after generating: {}MB".format(memory_usage_t() - self.mem))
 
         # init
         self.offset = dlp_container.offset
@@ -708,6 +740,8 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
     # ground(n) grounds n steps
     # ground(i,j) grounds from i to j (both included)
     def ground(self, start, end=None):
+
+        mem = memory_usage_t()
         
         t = time()
 
@@ -720,26 +754,33 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         self.steps = end
         # start
         for step in range(start, end+1):
+            mem_step = memory_usage_t()
+            adds = 0
             offset = (step-1)*self.offset
             for rule in self.rules:
+                adds += 1
                 self.backend.add_rule(
                     [x+offset for x in rule[1]],
-                    [x+offset for x in rule[2] if x  > 0] +
-                    [x-offset for x in rule[2] if x <= 0],
+                    [x-offset if x <= 0 else x+offset for x in rule[2]],
                     rule[0]
                 )
+            print("DLP: mem used after adding rules: {} MB".format(memory_usage_t() - mem_step))
+            print("DLP: adds: {}".format(adds))
             for rule in self.weight_rules:
                 self.backend.add_weight_rule(
                     [x+offset for x in rule[1]],
                     rule[2],
-                    [(x+offset,y) for x, y in rule[3] if x  > 0] +
-                    [(x-offset,y) for x, y in rule[3] if x <= 0],
+                    [(x+offset,y) if x  > 0 else (x-offset,y) for x, y in rule[3]] +
                     rule[0]
                 )
             for symbol in self.normal_externals.keys():
                 self.assigned_externals[(step, symbol)] = -1
 
+            print("DLP: mem used after step: {} MB".format(memory_usage_t() - mem_step))
+
         self._ground_time += time() - t
+
+        print("DLP: mem used grounding: {} MB".format(memory_usage_t() - mem))
 
     def assign_external(self, clingo_symbol, value):
         if len(clingo_symbol.arguments) != 1:
@@ -859,6 +900,8 @@ class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
 
         t = time()
 
+        self.mem = memory_usage_t()
+
         # preprocessing
         generator_class = self.get_generator_class()
         generator = generator_class(
@@ -873,6 +916,7 @@ class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
         # start
         dlp_container = generator.run()
 
+        print("mem used after generating: {}MB".format(memory_usage_t() - self.mem))
 
         # init
         self.offset = dlp_container.offset
