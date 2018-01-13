@@ -498,8 +498,8 @@ class SolverDLP:
                 self.__print_model(shown)
             self.__shown = shown
         else:
-            #self.__print_model(shown)
-            self.__dlp.print_model(m, self.__length)
+            self.__print_model(shown)
+            #self.__dlp.print_model(m, self.__length)
 
     # to get rid of clingo error when using the tester
     def get_shown(self):
@@ -590,6 +590,12 @@ class SolverDLP:
             self.__dlp.assign_external(
                 clingo.Function(QUERY,[length]), True
             )
+        
+        # for grounding tests, return unsat here to avoid having to solve
+        # also print the time
+
+        #log("\nDLP ground time: {}".format(self.__dlp._ground_time), PRINT)
+        #return UNSATISFIABLE
         result = self.__dlp.solve(on_model=self.__on_model)
         if self.__verbose: self.__verbose_end("Solving")
         log(str(result))
@@ -631,14 +637,14 @@ class Planner:
 
         # input files
 
-        instance_name = "instance-name-test.lp"
+        instance_name = "instance.lp"
 
         for i in options['files']:
             files.append(i)
         if options['read_stdin']:
-            #with open(instance_name, "w") as f:
-            #    f.write(get_stdin())
-            #files.append(instance_name)
+            with open(instance_name, "w") as f:
+                f.write(get_stdin())
+            files.append(instance_name)
             program += get_stdin()
         
         # additional programs
@@ -707,6 +713,14 @@ class Planner:
         dlp.start()
 
         dlp.assign_external(clingo.Function(QUERY,[0]), True)
+
+        # grounding test
+        """
+        init_time, start_time, ground_time = dlp.ground_time    
+
+        log("\nDLP init time: {}".format(init_time), PRINT)
+        log("\nDLP start time: {}".format(start_time), PRINT)
+        """
 
         # solver
         solver = SolverDLP(dlp,options)         
