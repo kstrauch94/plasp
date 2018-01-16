@@ -887,6 +887,9 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
                     ["{}:{}".format(x,y) for x,y in self.get_answer(m, step)]
                 )))
+    def get_model_str(self, m, step):
+
+        return " ".join(["{}:{}".format(x,y) for x,y in self.get_answer(m, step)])
 
     def __str__(self):
         out = ""

@@ -498,8 +498,15 @@ class SolverDLP:
                 self.__print_model(shown)
             self.__shown = shown
         else:
-            self.__print_model(shown)
-            #self.__dlp.print_model(m, self.__length)
+            #self.__print_model(shown)
+
+            line = self.__dlp.get_model_str(m, self.__length)
+
+            if self.__options['outf'] == 0:
+                log("Answer: {}\n{}".format(self.__models, line), PRINT)
+            else: 
+                log("ANSWER\n{}".format(line), FORCE_PRINT)
+            
 
     # to get rid of clingo error when using the tester
     def get_shown(self):

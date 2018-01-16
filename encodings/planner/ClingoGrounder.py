@@ -168,6 +168,9 @@ class DynamicLogicProgram(object):
     def solve(self, on_model, assumptions=[]):
         pass
 
+    def get_model_str(self, m, step):
+        return " ".join([str(atom) for atom in m.symbols(shown=True)])
+
 class DynamicLogicProgramText(DynamicLogicProgram):
 
     def __init__(self, files, program="", options={}, clingo_options=[]):
