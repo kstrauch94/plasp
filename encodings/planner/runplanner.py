@@ -333,10 +333,10 @@ def run():
         os.system('echo "a." | clingo --stats -')
 
     # remove output.sas if it has been left over by Fast Downward
-    try:
-        os.remove(SAS_OUTPUT)
-    except OSError:
-        pass
+    #try:
+    #    os.remove(SAS_OUTPUT)
+    #except OSError:
+    #    pass
 
     sys.exit(exitCode)
 
