@@ -7,6 +7,7 @@ from collections import namedtuple
 from time import clock, time
 from math import copysign
 
+import subprocess
 
 from ClingoGrounder import DynamicLogicProgram
 
@@ -23,6 +24,17 @@ FALSE = -3
 FITTING_TRUE     = 1
 FITTING_FALSE    = 2
 FITTING_CAUTIOUS = 3
+
+def print_args(func):
+
+    def f(*args, **kwargs):
+        print("function: {}".format(func))
+        print("args: {}".format(args[1:]))
+        print("kwargs: {}".format(kwargs))
+        return func(*args, **kwargs)
+
+    return f
+          
 
 # log
 log_level = 1
@@ -231,26 +243,30 @@ class DLPGenerator:
             if abs(i)>self.offset:
                 self.offset = abs(i)
 
+    #@print_args    
     def rule(self, choice, head, body):
         self.update_offset(head)
         self.update_offset(body)
         self.rules.append((choice, head, body))
 
+    #@print_args    
     def weight_rule(self, choice, head, lower_bound, body):
         self.update_offset(head)
         self.update_offset([x for x,y in body])
         self.weight_rules.append((choice, head, lower_bound, body))
 
+    #@print_args    
     def external(self, atom, value):
         self.update_offset([atom])
 
+    #@print_args    
     def output_atom(self, symbol, atom):
         self.output.append((atom, symbol))
 
     #
     # __str__
     #
-
+    
     def __str__(self):
         out = ""
         out += "\nOFFSET\n" + str(self.offset)
@@ -288,6 +304,253 @@ class DLPGenerator:
             ["{}".format(x) for x in sorted(self.init)]
         )
         return out
+
+class Symbol:
+    
+    def __init__(self, symbol, is_fact, is_external, literal):
+        self.symbol = symbol
+        self.is_fact = is_fact
+        self.is_external = is_external
+        self.literal = literal
+
+class SymbAtoms:
+
+    def __init__(self):
+        self.symbols = {}
+
+    def __getitem__(self,y):
+        return self.symbols[y]
+
+    def __iter__(self):
+        for x, v in self.symbols.iteritems():
+            yield v
+
+    def add(self, atom, is_fact, is_ext, lit):
+        try:
+            term = clingo.parse_term("".join(atom))
+        except RuntimeError as e:
+            print(atom)
+            print("ERROR parsing term {} || {}".format(atom, e))
+            raise Exception
+        s = Symbol(term, is_fact, is_ext, lit)
+
+        self.symbols[term] = s
+        
+
+class FakeControl:
+
+    def __init__(self, files, adds=""):
+        self.files = files
+        self.adds = adds
+
+        self.symbolic_atoms = SymbAtoms()
+
+        self.observers = []
+
+        self.external_lits = []
+
+        self.output_atoms = []
+
+    def register_observer(self, observer):
+        self.observers.append(observer)
+
+    def ground(self):
+        tmp = "temp12345.lp"
+
+        if self.adds != "":
+            with open(tmp, "w") as f:
+                f.write(self.adds)
+            
+            self.files += [tmp]
+
+        try:
+            self.ground_rules = subprocess.check_output(["clingo"] + self.files + ["--pre", "--warn=none"])
+        except subprocess.CalledProcessError as e:
+            self.ground_rules = e.output
+
+        if self.adds != "":
+            subprocess.check_call(["rm", tmp])
+
+        #print(self.ground_rules)
+
+    def parse(self):
+        # use [1:-1] to skip the first line saying the aspif version and the last empty line
+        for line in self.ground_rules.split("\n")[1:-1]:
+            line = line.split()
+
+            if line[0] == "1":
+                self.parse_rule(line)
+            if line[0] == "5":
+                self.parse_external(line)
+            if line[0] == "4":
+                self.parse_output(line)
+
+        self.set_output()
+
+    def parse_output(self, line):
+
+        # curate line
+        new_line = line[:2]
+        if len(line[2]) != int(line[1]):
+            new_line.append("".join(line[2:4]))
+            new_line += line[4:]
+            line = new_line
+            
+        
+        is_fact = line[3] == "0"
+        is_ext = False
+
+        if not is_fact:
+            lit = long(line[-1])
+            is_ext = lit in self.external_lits
+
+            self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
+
+        else:
+            is_ext = False
+            lit = None
+            
+            self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
+
+        term = clingo.parse_term(line[2])
+        if term.name == "show":
+            name = str(term.arguments[0])
+            arity = int(term.arguments[1].number)
+
+            self.output_atoms.append((name, arity))
+
+
+    def set_output(self):
+
+        for name, arity in self.output_atoms:
+            for symbol in self.symbolic_atoms:
+                if (symbol.symbol.name == name and
+                     len(symbol.symbol.arguments) == arity):
+                    for obs in self.observers:
+                        obs.output_atom(symbol.symbol, symbol.literal)
+
+
+    def parse_external(self, line):
+        lit = long(line[1])
+        val = int(line[2])
+
+        self.external_lits.append(lit)
+            
+        for obs in self.observers:
+            obs.external(lit, val)
+
+    def parse_rule(self, line):
+            
+        is_choice = line[1] == "1"
+        head_elements = int(line[2])
+        if head_elements == 0:
+            # constraint
+            head = []
+        else:
+            # get all heads
+            head = map(long, list(line[3:3+head_elements]))
+
+        body_type = int(line[3 + head_elements])
+        if body_type == 0:
+            #normal body
+            body_elements = line[4 + head_elements]
+            if body_elements == "0":
+                body = []
+            else:
+                body = map(long, list(line[5 + head_elements:]))
+
+            for obs in self.observers:
+                obs.rule(is_choice, head, body)
+            
+            #print(line)
+            #print(is_choice, head, body)
+
+        if body_type == 1:
+            #weight body
+            lower_bound = int(line[4 + head_elements])
+            number_of_lits = int(line[5 + head_elements])
+            body = map(long, list(line[6 + head_elements:]))
+            body = [body[i:i+2] for i in xrange(0,len(body),2)]
+    
+            for obs in self.observers:
+                obs.weight_rule(is_choice, head, lower_bound, body)
+    
+            #print(line)
+            #print(is_choice, head, lower_bound, body)
+
+class DLPGeneratorClingoPre(DLPGenerator):
+
+    def __init__(self, files = [], adds = "", options = []):
+        # input
+        self.files = files
+        self.adds = adds
+        self.options = options
+        # output
+        self.offset = 0
+        self.rules = []
+        self.weight_rules = []
+        self.primed_externals = {}
+        self.normal_externals = {}
+        self.output = []
+        self.output_facts = []
+        self.init = []
+        # rest
+        self.ctl = None
+        self.next = {}
+        self.mapping = []
+        self.solve_for_output = True
+
+    def run(self):
+        # preliminaries
+        self.ctl = FakeControl(self.files, self.adds)
+        self.ctl.register_observer(self)
+        self.ctl.ground()
+        self.ctl.parse()
+        #print(self)
+        # analyze
+        self.set_externals()
+        self.simplify()
+        self.set_next()
+        self.set_mapping()
+        self.map_rules()
+        self.map_weight_rules()
+        self.handle_externals()
+        self.set_output()
+        self.set_init()
+        # return
+        return DynamicLogicProgramContainer(
+            self.offset, self.rules, self.weight_rules,
+            self.primed_externals, self.normal_externals,
+            self.output, self.output_facts, self.init
+        )
+
+    def set_externals(self):
+        for x in self.ctl.symbolic_atoms:
+            if x.is_external:
+                #self.ctl.assign_external(x.symbol, None)
+                if len(x.symbol.name) and x.symbol.name[-1]=="'":
+                    self.primed_externals[x.symbol] = x.literal
+                else:
+                    self.normal_externals[x.symbol] = x.literal
+
+    def set_output(self):
+        # map
+        # delete the solve if havent solved before
+        idx = 0
+        for atom, symbol in self.output:
+            mapped_atom = self.mapping[atom]
+            if atom == 0 or mapped_atom == TRUE:
+                self.output_facts.append(str(symbol))
+                continue
+            elif mapped_atom == FALSE:
+                continue
+            elif mapped_atom > self.offset:
+                mapped_atom -= self.offset
+            else:                                          # primed external
+                symbol = clingo.Function(symbol.name[:-1], symbol.arguments)
+            self.output[idx] = (mapped_atom, str(symbol))
+            idx += 1
+        self.output = self.output[0:idx]
 
 
 SAtom  = namedtuple('SAtom', 
@@ -327,12 +590,13 @@ class DLPGeneratorSimplifier(DLPGenerator):
 
     def get_consequences(self, opt, true):
         self.ctl.configuration.solve.enum_mode = opt
-        old_restarts = self.ctl.configuration.solve.solve_limit
-        print(old_restarts)
-        self.ctl.configuration.solve.solve_limit = "umax," + "1"
-        print(self.ctl.configuration.solve.solve_limit)
+        
+        #old_restarts = self.ctl.configuration.solve.solve_limit
+        #print(old_restarts)
+        #self.ctl.configuration.solve.solve_limit = "umax," + "1"
+        #print(self.ctl.configuration.solve.solve_limit)
 
-        with self.ctl.solve(yield_=True) as handle:
+        """with self.ctl.solve(yield_=True) as handle:
             last = None
             for m in handle:
                 last = m
@@ -342,8 +606,31 @@ class DLPGeneratorSimplifier(DLPGenerator):
                 symbols = last.symbols(shown=True)
             else:
                 symbols = last.symbols(shown=True, complement=True)
+        """
 
-        self.ctl.configuration.solve.restarts = old_restarts
+        time_limit = 0.1
+
+        with self.ctl.solve(yield_=True, async=True) as handle:
+            time_used = 0
+            last = None
+            while time_used < time_limit and handle.wait(time_limit - time_used):
+                t = time()
+                try:
+                    last = handle.next()
+                except StopIteration:
+                    time_used += time() - t
+                    break
+                time_used += time() - t
+
+            if last is None:
+                raise Exception(STR_UNSAT)
+            if true:
+                symbols = last.symbols(shown=True)
+            else:
+                symbols = last.symbols(shown=True, complement=True)
+
+        print("DLP: Time used on {} consequences: {}".format(opt, time_used))
+        #self.ctl.configuration.solve.solve_limit = old_restarts
 
         return [self.ctl.symbolic_atoms[x].literal for x in symbols]
 
@@ -810,6 +1097,7 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
             raise Exception(GROUNDING_ERROR)
         self.steps = end
         # start
+        print("DLP: rules grounded: {}".format(len(self.rules)))
         for step in range(start, end+1):
 
             offset = (step-1)*self.offset
@@ -819,6 +1107,8 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
                 self.backend.add_rule(
                     [x+offset for x in rule[1]],
                     [x-offset if x <= 0 else x+offset for x in rule[2]],
+                    #[x+offset for x in rule[2] if x > 0] + 
+                    #[x-offset for x in rule[2] if x <= 0],
                     rule[0]
                 )
 
@@ -1038,6 +1328,48 @@ class DynamicLogicProgramBackendSimplified_NCNB(DynamicLogicProgramBackend):
     def get_generator_class(self):
         return DLPGeneratorSimplifier
 
+class DynamicLogicProgramBackendClingoPre(DynamicLogicProgramBackend):
+
+    def __init__(self, files, program="", options=[], clingo_options=[]):
+
+        t = time()
+
+        # preprocessing
+        generator_class = self.get_generator_class()
+        generator = generator_class(
+            files = files,
+            adds  = program,
+            options = clingo_options,
+            #compute_cautious = False,
+            #compute_brave = False
+        )
+
+        # start
+        dlp_container = generator.run()
+
+
+        # init
+        self.offset = dlp_container.offset
+        self.rules = dlp_container.rules
+        self.weight_rules = dlp_container.weight_rules
+        self.primed_externals = dlp_container.primed_externals
+        self.normal_externals = dlp_container.normal_externals
+        self.output = dlp_container.output
+        self.output_facts = dlp_container.output_facts
+        self.init = dlp_container.init
+        # rest
+        self.control = clingo.Control(clingo_options)
+        self.backend = self.control.backend
+        self.steps = 0
+        self.assigned_externals = {}
+
+        self._init_time = time() - t
+        self._start_time = 0
+        self._ground_time = 0
+    
+    def get_generator_class(self):
+        return DLPGeneratorClingoPre
+
 
 def incmode():
 
@@ -1062,18 +1394,20 @@ def incmode():
     """
 
     #dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
-    dlp = DynamicLogicProgramBackend(["basic-backend-ex.lp"], clingo_options=sys.argv[1:])
+    dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
+
+    #dlp = DynamicLogicProgramBackendClingoPre(["example-clingo-pre.lp"], clingo_options=sys.argv[1:])
     dlp.start()
     print(dlp); return
 
     # loop
     step, ret = 1, None
     while True:
-        if step == 3: return
+        if step > 2: return
         dlp.release_external(clingo.Function("query",[step-1]))
         dlp.ground(1)
         dlp.assign_external(clingo.Function("query",[step]), True)
-        print(dlp.assigned_externals)
+
         with dlp.control.solve(assumptions=dlp.get_assumptions(), yield_ = True) as handle:
             for m in handle:
                 print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(

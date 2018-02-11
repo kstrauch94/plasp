@@ -644,15 +644,14 @@ class Planner:
 
         # input files
 
-        instance_name = "instance.lp"
+        #instance_name = "instance.lp"
 
         for i in options['files']:
             files.append(i)
         if options['read_stdin']:
-            with open(instance_name, "w") as f:
-                f.write(get_stdin())
-            files.append(instance_name)
             program += get_stdin()
+            #with open(instance_name, "w") as f:
+            #    f.writelines(program)
         
         # additional programs
 
@@ -716,6 +715,19 @@ class Planner:
                 program += FORCE_ACTIONS_PROGRAM_BACKEND
 
             dlp = temporal.DynamicLogicProgramBackendSimplified_NCNB(files, program, options, clingo_options)
+
+
+        elif options["dlp"] == DLP_BACKEND_CLINGO_PRE:
+
+            program += EXTERNALS_PROGRAM_BACKEND
+            if options['test']:
+                program += TEST_NO_WARNING
+            if options['forbid_actions']: 
+                program += FORBID_ACTIONS_PROGRAM_BACKEND
+            if options['force_actions']:  
+                program += FORCE_ACTIONS_PROGRAM_BACKEND
+
+            dlp = temporal.DynamicLogicProgramBackendClingoPre(files, program, options, clingo_options)
 
         dlp.start()
 
@@ -827,6 +839,7 @@ DLP_TEXT    = "text"
 DLP_BACKEND = "backend"
 DLP_BACKEND_SIMPLIFIED = "backend-simplified"
 DLP_BACKEND_SIMPLIFIED_NCNB = "backend-simplified-ncnb"
+DLP_BACKEND_CLINGO_PRE = "backend-clingo-pre"
 
 #DLP encodings
 
@@ -927,7 +940,7 @@ Get help/report bugs via : https://potassco.org/support
             help="Ground check program only for the current latest time point"
         )
 
-        solving.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED, DLP_BACKEND_SIMPLIFIED_NCNB],
+        solving.add_argument('--dlp' ,dest='dlp', choices=[DLP_TEXT, DLP_BACKEND, DLP_BACKEND_SIMPLIFIED, DLP_BACKEND_SIMPLIFIED_NCNB, DLP_BACKEND_CLINGO_PRE],
             help='Use the specified DLP with its apropriate encoding')
 
         # Scheduler
