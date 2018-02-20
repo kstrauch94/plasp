@@ -5,12 +5,11 @@ from time import time
 import clingo
 
 import sys
-
+import os
 
 #
 # MEMORY USAGE (for Unix)
 #
-import os
 def memory_usage_t(key="VmSize"):
 
     # data
@@ -37,6 +36,8 @@ def memory_usage_t(key="VmSize"):
 
 
 class DynamicLogicProgram(object):
+
+    # base class
 
     def __init__(self, files, program="", options=[], clingo_options=[]):
         pass
@@ -84,8 +85,6 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
             adds  = [("base", [], program)],
             parts = [("base", [])],
             options = clingo_options,
-            #compute_cautious = False,
-            #compute_brave = False
         )
 
         # start
@@ -135,7 +134,9 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
     # ground(n) grounds n steps
     # ground(i,j) grounds from i to j (both included)
     def ground2(self, start, end=None):
-
+        #########################
+        # this function is here just to test memory!!!
+        ##############################
         mem = memory_usage_t()
         
         t = time()
@@ -215,8 +216,6 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
                 self.backend.add_rule(
                     [x+offset for x in rule[1]],
                     [x-offset if x <= 0 else x+offset for x in rule[2]],
-                    #[x+offset for x in rule[2] if x > 0] + 
-                    #[x-offset for x in rule[2] if x <= 0],
                     rule[0]
                 )
 
@@ -447,9 +446,7 @@ class DynamicLogicProgramBackendClingoPre(DynamicLogicProgramBackend):
         generator = generator_class(
             files = files,
             adds  = program,
-            options = clingo_options,
-            #compute_cautious = False,
-            #compute_brave = False
+            options = clingo_options
         )
 
         # start
@@ -485,7 +482,7 @@ class DynamicLogicProgramText(DynamicLogicProgram):
 
         t = time()
 
-        self.grounder = Generators.Grounder(files=files, program=program)
+        self.grounder = Generators.Grounder(files=files, program=program, options=clingo_options)
 
         self.control = clingo.Control(clingo_options)
 
@@ -680,30 +677,10 @@ class DynamicLogicProgramBasic(DynamicLogicProgram):
 def incmode():
     
 
-    """
-    # preprocessing
-    #generator_class = DLPGenerator
-    generator_class = DLPGeneratorSimplifier
-    generator = generator_class(
-        files = ["example.lp"],
-        #files = ["myexample.lp"],
-        # adds  = [("base", [], base)],
-        parts = [("base", [])],
-        options = sys.argv[1:],
-        #compute_cautious = False,
-        #compute_brave = False
-    )
-
-    # start
-    dlp = generator.run()
-    dlp.start()
-    #print(dlp); return
-    """
-
     #dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
-    dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
+    #dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
 
-    #dlp = DynamicLogicProgramBackendClingoPre(["example-clingo-pre.lp"], clingo_options=sys.argv[1:])
+    dlp = DynamicLogicProgramBackendClingoPre(["example-clingo-pre.lp"], clingo_options=sys.argv[1:])
     dlp.start()
     print(dlp); return
 

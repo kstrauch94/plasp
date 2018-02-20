@@ -97,6 +97,8 @@ class DLPGenerator:
         )
 
     def set_externals(self):
+        # check symbolic atoms for externals and add them 
+        # to either primed or normal externals list
         for x in self.ctl.symbolic_atoms:
             if x.is_external:
                 self.ctl.assign_external(x.symbol, None)
@@ -265,12 +267,14 @@ class DLPGenerator:
 class Symbol:
     
     def __init__(self, symbol, is_fact, is_external, literal):
+        # set up data that is found on a symbol
         self.symbol = symbol
         self.is_fact = is_fact
         self.is_external = is_external
         self.literal = literal
 
 class SymbAtoms:
+    # simulate the SymbolicAtoms class from clingo
 
     def __init__(self):
         self.symbols = {}
@@ -283,6 +287,9 @@ class SymbAtoms:
             yield v
 
     def add(self, atom, is_fact, is_ext, lit):
+        # pass a string and transform it into a clingo term
+        # also pass the relevant symbol information
+        # add the clingo term as the key and the symbol as the value
         try:
             term = clingo.parse_term("".join(atom))
         except RuntimeError as e:
@@ -295,6 +302,7 @@ class SymbAtoms:
         
 
 class FakeControl:
+    # simulate a clingo control object
 
     def __init__(self, files, adds="", options=[]):
         self.files = files
@@ -334,6 +342,7 @@ class FakeControl:
             self.ground_rules = e.output
 
         if self.adds != "":
+            # delete temp if it was created
             subprocess.check_call(["rm", tmp])
 
         #print(self.ground_rules)
@@ -355,6 +364,9 @@ class FakeControl:
     def parse_output(self, line):
 
         # curate line
+        # sometimes predicate name is too long and it splits into 2 parts separated by space -> error with .split()
+        # here we check that the length of the string is equal to the byte count
+        # if it isnt then we merge the two strings into one and create a new "line"
         new_line = line[:2]
         if len(line[2]) != int(line[1]):
             new_line.append("".join(line[2:4]))
@@ -363,20 +375,26 @@ class FakeControl:
             
         
         is_fact = line[3] == "0"
-        is_ext = False
 
-        if not is_fact:
+        if is_fact:
+            is_ext = False
+            # lit is None because we can't know which literal belongs to this fact
+            # the literal for a fact is also never needed in the generator class
+            # so this should be fine
+            # unless we want to output facts :/
+            lit = None
+            
+            self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
+
+        else:
             lit = long(line[-1])
             is_ext = lit in self.external_lits
 
             self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
 
-        else:
-            is_ext = False
-            lit = None
-            
-            self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
 
+        # if the term has the name "show" then we add the arguments to the output
+        # to be processed later
         term = clingo.parse_term(line[2])
         if term.name == "show":
             name = str(term.arguments[0])
@@ -387,6 +405,8 @@ class FakeControl:
 
     def set_output(self):
 
+        # for each output found in the rules search for a matching symbol
+        # this won't work for facts since facts have no literals
         for name, arity in self.output_atoms:
             for symbol in self.symbolic_atoms:
                 if (symbol.symbol.name == name and
@@ -405,17 +425,24 @@ class FakeControl:
             obs.external(lit, val)
 
     def parse_rule(self, line):
-            
+        
+        # here we need to be careful because the values in the "line" are strings
+        # but sometimes we need them as ints!
+    
         is_choice = line[1] == "1"
         head_elements = int(line[2])
         if head_elements == 0:
             # constraint
             head = []
         else:
-            # get all heads
+            # get all heads and convert them to longs in case the number is big
             head = map(long, list(line[3:3+head_elements]))
 
+        # head elements influences the position of the body type marker
+        # and also of the start of the body atoms. So we "shift" their positions
+        # when grabbing from the list
         body_type = int(line[3 + head_elements])
+
         if body_type == 0:
             #normal body
             body_elements = line[4 + head_elements]
@@ -426,9 +453,6 @@ class FakeControl:
 
             for obs in self.observers:
                 obs.rule(is_choice, head, body)
-            
-            #print(line)
-            #print(is_choice, head, body)
 
         if body_type == 1:
             #weight body
@@ -439,11 +463,9 @@ class FakeControl:
     
             for obs in self.observers:
                 obs.weight_rule(is_choice, head, lower_bound, body)
-    
-            #print(line)
-            #print(is_choice, head, lower_bound, body)
 
 class DLPGeneratorClingoPre(DLPGenerator):
+    # pretty much equal to DLP generator, just slightly different arguments
 
     def __init__(self, files = [], adds = "", options = []):
         # input
@@ -492,7 +514,6 @@ class DLPGeneratorClingoPre(DLPGenerator):
     def set_externals(self):
         for x in self.ctl.symbolic_atoms:
             if x.is_external:
-                #self.ctl.assign_external(x.symbol, None)
                 if len(x.symbol.name) and x.symbol.name[-1]=="'":
                     self.primed_externals[x.symbol] = x.literal
                 else:
@@ -500,7 +521,7 @@ class DLPGeneratorClingoPre(DLPGenerator):
 
     def set_output(self):
         # map
-        # delete the solve if havent solved before
+        # delete the solve if havent solved before that is in the backend DLP Generator
         idx = 0
         for atom, symbol in self.output:
             mapped_atom = self.mapping[atom]
@@ -541,6 +562,9 @@ class DLPGeneratorSimplifier(DLPGenerator):
         self.cautious = []
         self.add_constraints = []
         self.solve_for_output = False
+        
+        # maximum time that calculating cautious or brave consequences can take
+        self.time_limit = 0.1
 
     def simplify(self):
         self.mapping = [None]*len(self.satoms)
@@ -554,30 +578,11 @@ class DLPGeneratorSimplifier(DLPGenerator):
             self.solve_for_output = True
 
     def get_consequences(self, opt, true):
-        self.ctl.configuration.solve.enum_mode = opt
-        old_restarts = self.ctl.configuration.solve.solve_limit
-        print(old_restarts)
-        self.ctl.configuration.solve.solve_limit = "umax," + "1"
-        print(self.ctl.configuration.solve.solve_limit)
-
-        """with self.ctl.solve(yield_=True) as handle:
-            last = None
-            for m in handle:
-                last = m
-            if last is None:
-                raise Exception(STR_UNSAT)
-            if true:
-                symbols = last.symbols(shown=True)
-            else:
-                symbols = last.symbols(shown=True, complement=True)
-        """
-
-        time_limit = 0.1
 
         with self.ctl.solve(yield_=True, async=True) as handle:
             time_used = 0
             last = None
-            while time_used < time_limit and handle.wait(time_limit - time_used):
+            while time_used < self.time_limit and handle.wait(self.time_limit - time_used):
                 t = time()
                 try:
                     last = handle.next()
@@ -585,17 +590,18 @@ class DLPGeneratorSimplifier(DLPGenerator):
                     time_used += time() - t
                     break
                 time_used += time() - t
-                
-            if true:
+             
+            print("DLP: Time used on {} consequences: {}".format(opt, time_used))
+
+            if last is None:
+                # if we found nothing in the alloted time then return nothing
+                return []
+   
+            elif true:
                 symbols = last.symbols(shown=True)
             else:
                 symbols = last.symbols(shown=True, complement=True)
 
-        print("DLP: Time used on {} consequences: {}".format(opt, time_used))
-        self.ctl.configuration.solve.solve_limit = old_restarts
-        if last is None:
-            #raise Exception(STR_UNSAT)
-            return []
         return [self.ctl.symbolic_atoms[x].literal for x in symbols]
 
     def remove_rule_from_heads(self, rule, atom, weight=False):
@@ -907,9 +913,8 @@ class DLPGeneratorSimplifier(DLPGenerator):
     def external(self, atom, value):
         self.add_satoms(atom, False)
 
-
-
 class DynamicLogicProgramContainer:
+    # just a container for the data
 
     def __init__(self, offset, rules, weight_rules,
                  primed_externals, normal_externals,
@@ -930,10 +935,9 @@ time_str = "%times for transition \n#program base. \n time(1000000001)."
 time_0 = "1000000000"
 time_1 = "1000000001"
 
-verbose = True
 class Grounder(object):
 
-    def __init__(self, files, program="", debug=False):
+    def __init__(self, files, program="", options=[], debug=False):
 
         self.debug = debug
         self.debug_gf_name = "g.lp"
@@ -949,7 +953,7 @@ class Grounder(object):
         # ground file as temp file
         self.gf = NamedTemporaryFile(delete=False)
 
-        self.ground_command = "clingo {} --text > {}".format(" ".join(files), self.gf.name)
+        self.ground_command = "clingo {} {} --text > {}".format(" ".join(files), " ".join(options), self.gf.name)
 
         self.grounded_rules = []
         self.other_rules = []
