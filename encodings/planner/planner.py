@@ -14,8 +14,7 @@ from time import time
 import clingo_stats
 import os
 
-import ClingoGrounder
-import temporal
+import DLP
 
 # 
 # DEFINES
@@ -647,6 +646,7 @@ class Planner:
         #instance_name = "instance.lp"
 
         for i in options['files']:
+            print(i)
             files.append(i)
         if options['read_stdin']:
             program += get_stdin()
@@ -666,7 +666,7 @@ class Planner:
             if options['force_actions']:  
                 program += FORCE_ACTIONS_PROGRAM_BASIC
 
-            dlp = ClingoGrounder.DynamicLogicProgramBasic(files, program, options, clingo_options)
+            dlp = DLP.DynamicLogicProgramBasic(files, program, options, clingo_options)
 
         elif options["dlp"] == DLP_TEXT:
 
@@ -678,7 +678,7 @@ class Planner:
             if options['force_actions']:  
                 program += FORCE_ACTIONS_PROGRAM_TEXT
 
-            dlp = ClingoGrounder.DynamicLogicProgramText(files, program, options, clingo_options)
+            dlp = DLP.DynamicLogicProgramText(files, program, options, clingo_options)
 
         elif options["dlp"] == DLP_BACKEND:
 
@@ -690,7 +690,7 @@ class Planner:
             if options['force_actions']:  
                 program += FORCE_ACTIONS_PROGRAM_BACKEND
 
-            dlp = temporal.DynamicLogicProgramBackend(files, program, options, clingo_options)
+            dlp = DLP.DynamicLogicProgramBackend(files, program, options, clingo_options)
 
         elif options["dlp"] == DLP_BACKEND_SIMPLIFIED:
 
@@ -702,7 +702,7 @@ class Planner:
             if options['force_actions']:  
                 program += FORCE_ACTIONS_PROGRAM_BACKEND
 
-            dlp = temporal.DynamicLogicProgramBackendSimplified(files, program, options, clingo_options)
+            dlp = DLP.DynamicLogicProgramBackendSimplified(files, program, options, clingo_options)
 
         elif options["dlp"] == DLP_BACKEND_SIMPLIFIED_NCNB:
 
@@ -714,7 +714,7 @@ class Planner:
             if options['force_actions']:  
                 program += FORCE_ACTIONS_PROGRAM_BACKEND
 
-            dlp = temporal.DynamicLogicProgramBackendSimplified_NCNB(files, program, options, clingo_options)
+            dlp = DLP.DynamicLogicProgramBackendSimplified_NCNB(files, program, options, clingo_options)
 
 
         elif options["dlp"] == DLP_BACKEND_CLINGO_PRE:
@@ -727,7 +727,7 @@ class Planner:
             if options['force_actions']:  
                 program += FORCE_ACTIONS_PROGRAM_BACKEND
 
-            dlp = temporal.DynamicLogicProgramBackendClingoPre(files, program, options, clingo_options)
+            dlp = DLP.DynamicLogicProgramBackendClingoPre(files, program, options, clingo_options)
 
         dlp.start()
 

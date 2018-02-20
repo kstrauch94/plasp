@@ -143,4 +143,4 @@ alright(A) :- perform(A).
 
 % DISPLAY PART
 
-#show occurs/1.
+show(occurs, 1).

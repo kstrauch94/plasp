@@ -9,7 +9,8 @@ from math import copysign
 
 import subprocess
 
-from ClingoGrounder import DynamicLogicProgram
+from tempfile import NamedTemporaryFile
+import os
 
 # DEFINES
 STR_UNSAT = "error: input program is UNSAT"
@@ -23,53 +24,13 @@ FALSE = -3
 # fitting
 FITTING_TRUE     = 1
 FITTING_FALSE    = 2
-FITTING_CAUTIOUS = 3
-
-def print_args(func):
-
-    def f(*args, **kwargs):
-        print("function: {}".format(func))
-        print("args: {}".format(args[1:]))
-        print("kwargs: {}".format(kwargs))
-        return func(*args, **kwargs)
-
-    return f
-          
+FITTING_CAUTIOUS = 3      
 
 # log
 log_level = 1
 def log(*args):
     if log_level == 1:
         print(*args)
-
-#
-# MEMORY USAGE (for Unix)
-#
-import os
-def memory_usage_t(key="VmSize"):
-
-    # data
-    proc_status = '/proc/%d/status' % os.getpid()
-    scale = {'kB': 1024.0, 'mB': 1,
-             'KB': 1024.0, 'MB': 1}
-
-    # get pseudo file  /proc/<pid>/status
-    try:
-        t = open(proc_status)
-        v = t.read()
-        t.close()
-    except:
-        return -1  # non-Linux?
-
-    # get key line e.g. 'VmSize:  9999  kB\n ...'
-    i = v.index(key)
-    v = v[i:].split(None, 3)  # whitespace
-    if len(v) < 3:
-        return -1  # invalid format?
-
-    # return
-    return int(float(v[1]) / scale[v[2]])
-
 
 #
 # Syntax Restriction:
@@ -242,24 +203,20 @@ class DLPGenerator:
         for i in _list:
             if abs(i)>self.offset:
                 self.offset = abs(i)
-
-    #@print_args    
+    
     def rule(self, choice, head, body):
         self.update_offset(head)
         self.update_offset(body)
         self.rules.append((choice, head, body))
-
-    #@print_args    
+   
     def weight_rule(self, choice, head, lower_bound, body):
         self.update_offset(head)
         self.update_offset([x for x,y in body])
         self.weight_rules.append((choice, head, lower_bound, body))
-
-    #@print_args    
+    
     def external(self, atom, value):
         self.update_offset([atom])
-
-    #@print_args    
+   
     def output_atom(self, symbol, atom):
         self.output.append((atom, symbol))
 
@@ -339,10 +296,12 @@ class SymbAtoms:
 
 class FakeControl:
 
-    def __init__(self, files, adds=""):
+    def __init__(self, files, adds="", options=[]):
         self.files = files
         self.adds = adds
+        self.options = options
 
+        # simulate symbolic atoms list
         self.symbolic_atoms = SymbAtoms()
 
         self.observers = []
@@ -355,6 +314,7 @@ class FakeControl:
         self.observers.append(observer)
 
     def ground(self):
+        # add extra program to temp file if needed
         tmp = "temp12345.lp"
 
         if self.adds != "":
@@ -363,9 +323,14 @@ class FakeControl:
             
             self.files += [tmp]
 
+        # subprocess.check_output throws error with non zero return value.
+        # clingo returns 21(or something similar) for succesful grounding
+        # so it will always be an error, hence the try block
         try:
-            self.ground_rules = subprocess.check_output(["clingo"] + self.files + ["--pre", "--warn=none"])
+            self.ground_rules = subprocess.check_output(["clingo"] + self.files + ["--pre"] + self.options)
         except subprocess.CalledProcessError as e:
+            # becase its always an error, grab the "error" as the output
+            # which should be the aspif program
             self.ground_rules = e.output
 
         if self.adds != "":
@@ -502,7 +467,7 @@ class DLPGeneratorClingoPre(DLPGenerator):
 
     def run(self):
         # preliminaries
-        self.ctl = FakeControl(self.files, self.adds)
+        self.ctl = FakeControl(self.files, self.adds, self.options)
         self.ctl.register_observer(self)
         self.ctl.ground()
         self.ctl.parse()
@@ -590,11 +555,10 @@ class DLPGeneratorSimplifier(DLPGenerator):
 
     def get_consequences(self, opt, true):
         self.ctl.configuration.solve.enum_mode = opt
-        
-        #old_restarts = self.ctl.configuration.solve.solve_limit
-        #print(old_restarts)
-        #self.ctl.configuration.solve.solve_limit = "umax," + "1"
-        #print(self.ctl.configuration.solve.solve_limit)
+        old_restarts = self.ctl.configuration.solve.solve_limit
+        print(old_restarts)
+        self.ctl.configuration.solve.solve_limit = "umax," + "1"
+        print(self.ctl.configuration.solve.solve_limit)
 
         """with self.ctl.solve(yield_=True) as handle:
             last = None
@@ -621,17 +585,17 @@ class DLPGeneratorSimplifier(DLPGenerator):
                     time_used += time() - t
                     break
                 time_used += time() - t
-
-            if last is None:
-                raise Exception(STR_UNSAT)
+                
             if true:
                 symbols = last.symbols(shown=True)
             else:
                 symbols = last.symbols(shown=True, complement=True)
 
         print("DLP: Time used on {} consequences: {}".format(opt, time_used))
-        #self.ctl.configuration.solve.solve_limit = old_restarts
-
+        self.ctl.configuration.solve.solve_limit = old_restarts
+        if last is None:
+            #raise Exception(STR_UNSAT)
+            return []
         return [self.ctl.symbolic_atoms[x].literal for x in symbols]
 
     def remove_rule_from_heads(self, rule, atom, weight=False):
@@ -960,463 +924,138 @@ class DynamicLogicProgramContainer:
         self.output_facts = output_facts
         self.init = init
 
-class DynamicLogicProgramBackend(DynamicLogicProgram):
 
-    def __init__(self, files, program="", options=[], clingo_options=[]):
+time_str = "%times for transition \n#program base. \n time(1000000001)."
 
-        t = time()
+time_0 = "1000000000"
+time_1 = "1000000001"
 
-        # preprocessing
+verbose = True
+class Grounder(object):
 
-        self.mem = memory_usage_t()
+    def __init__(self, files, program="", debug=False):
 
-        generator_class = self.get_generator_class()
-        generator = generator_class(
-            files = files,
-            adds  = [("base", [], program)],
-            parts = [("base", [])],
-            options = clingo_options,
-            #compute_cautious = False,
-            #compute_brave = False
-        )
+        self.debug = debug
+        self.debug_gf_name = "g.lp"
+        # write program + time to tempfile
+        self.prog_file = NamedTemporaryFile(delete=False)
 
-        # start
-        dlp_container = generator.run()
+        self.prog_file.write(program)
+        self.prog_file.write(time_str)
+        self.prog_file.flush()
 
-        print("mem used after generating: {}MB".format(memory_usage_t() - self.mem))
+        files += [self.prog_file.name]
 
-        # init
-        self.offset = dlp_container.offset
-        self.rules = dlp_container.rules
-        self.weight_rules = dlp_container.weight_rules
-        self.primed_externals = dlp_container.primed_externals
-        self.normal_externals = dlp_container.normal_externals
-        self.output = dlp_container.output
-        self.output_facts = dlp_container.output_facts
-        self.init = dlp_container.init
-        # rest
-        self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
-        self.steps = 0
-        self.assigned_externals = {}
+        # ground file as temp file
+        self.gf = NamedTemporaryFile(delete=False)
 
-        # set solving and restart policy
-        if 'restarts_per_solve' in options:
-            self.control.configuration.solve.solve_limit = "umax," + str(options['restarts_per_solve'])
+        self.ground_command = "clingo {} --text > {}".format(" ".join(files), self.gf.name)
 
-        if 'conflicts_per_restart' in options:
-            if int(options['conflicts_per_restart']) != 0:
-                self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
+        self.grounded_rules = []
+        self.other_rules = []
+        self.init = []
 
-        self._init_time = time() - t
-        self._start_time = 0
-        self._ground_time = 0
-    
-    def get_generator_class(self):
-        return DLPGenerator
+        self.timelimit = None
 
-    def start(self):
+        self.has_grounded = False
 
-        t = time()
+        self.grounding_time = 0
 
-        for atom in self.init:
-            self.backend.add_rule([atom], [], False)
 
-        self._start_time = time() - t
+    def parse_prog(self):
 
-    # ground(n) grounds n steps
-    # ground(i,j) grounds from i to j (both included)
-    def ground2(self, start, end=None):
+        if self.has_grounded:
+            print("The grounding process has already been done, skipping...")
+            return
 
-        mem = memory_usage_t()
-        
-        t = time()
+        start_time = time()
 
-        # preprocess
-        if end == None:
-            end = self.steps + start
-            start = self.steps + 1
-        elif self.steps != start-1:
-            raise Exception(GROUNDING_ERROR)
-        self.steps = end
-        # start
-        for step in range(start, end+1):
-            mem_step = memory_usage_t()
-            adds = 0
-            offset = (step-1)*self.offset
-            i = []
-            for rule in self.rules:
-                adds += 1
-                #self.backend.add_rule(
-                #    [x+offset for x in rule[1]],
-                #    [x-offset if x <= 0 else x+offset for x in rule[2]],
-                #    rule[0]
-                #)
+        subprocess.call(self.ground_command, shell=True)
+        self.prog_file.close()
+        os.unlink(self.prog_file.name)
 
-                i.append( ( [x+offset for x in rule[1]],
-                        [x-offset if x <= 0 else x+offset for x in rule[2]],
-                        rule[0] ) ) 
-            mem_before_backend = memory_usage_t()
-            for r in i:
-                self.backend.add_rule(r[0], r[1], r[2])
-            i = []
-            mem_after_backend = memory_usage_t()
+        main_criteria = [time_0, time_1]
+        other_rule_criteria = ["timelimit", "#show"]
 
-            print("DLP: step {}".format(step))
-            print("DLP:mem at beggining: {}".format(mem_step))
-            print("DLP:mem after rule creation: {}".format(mem_before_backend))
-            print("DLP:mem after adding to backend: {}".format(mem_after_backend))
+        with open(self.gf.name, "r") as f:
+            for rule in f.readlines():
+                if rule.strip() == "time(" + time_0 + ")." or rule.strip() == "time(" + time_1 + ").":
+                    continue
+                elif any(check in rule for check in other_rule_criteria):
+                    if "timelimit(" in rule:
+                        self.timelimit = int(rule[rule.find("(") + 1:rule.rfind(")")])
+                    else:
+                        self.other_rules.append(rule)
+                elif "#external" in rule and time_1 in rule:
+                    self.grounded_rules.append(rule)
+                elif "init(" in rule:
+                    atom = rule[rule.find("(")+1:rule.rfind(")")].replace(time_0, "0")
+                    self.init.append(atom)
+                elif "#external" not in rule and any(check in rule for check in main_criteria):
+                    self.grounded_rules.append(rule)
 
-            print("DLP: mem used after adding rules: {} MB".format(memory_usage_t() - mem_step))
-            print("DLP: adds: {}".format(adds))
-            for rule in self.weight_rules:
-                self.backend.add_weight_rule(
-                    [x+offset for x in rule[1]],
-                    rule[2],
-                    [(x+offset,y) if x  > 0 else (x-offset,y) for x, y in rule[3]],
-                    rule[0]
-                )
-            for symbol in self.normal_externals.keys():
-                self.assigned_externals[(step, symbol)] = -1
+        self.has_grounded = True
 
-            print("DLP: mem used after step: {} MB".format(memory_usage_t() - mem_step))
+        if self.debug:
+            with open(self.gf.name, "r") as f:
+                with open(self.debug_gf_name, "w") as df:
+                    df.write(f.read())
 
-        self._ground_time += time() - t
+        self.gf.close()
+        os.unlink(self.gf.name)
 
-        print("DLP: mem used grounding: {} MB".format(memory_usage_t() - mem))
+        self.grounding_time += time() - start_time
 
-    def ground(self, start, end=None):
-        ### fuction without any memory adds
-        t = time()
+    def ground_range(self, start, end):
 
-        # preprocess
-        if end == None:
-            end = self.steps + start
-            start = self.steps + 1
-        elif self.steps != start-1:
-            raise Exception(GROUNDING_ERROR)
-        self.steps = end
-        # start
-        print("DLP: rules grounded: {}".format(len(self.rules)))
-        for step in range(start, end+1):
+        start_time = time()
 
-            offset = (step-1)*self.offset
+        if not self.has_grounded:
+            print("ERROR: grounding has not taken place yet")
+            return
 
-            for rule in self.rules:
+        rules = {}
 
-                self.backend.add_rule(
-                    [x+offset for x in rule[1]],
-                    [x-offset if x <= 0 else x+offset for x in rule[2]],
-                    #[x+offset for x in rule[2] if x > 0] + 
-                    #[x-offset for x in rule[2] if x <= 0],
-                    rule[0]
-                )
+        for t in range(start, end+1):
+            rules[t] = [rule.replace(time_0, str(t - 1)).replace(time_1, str(t)) for rule in self.grounded_rules]
 
-            for rule in self.weight_rules:
-                self.backend.add_weight_rule(
-                    [x+offset for x in rule[1]],
-                    rule[2],
-                    [(x+offset,y) if x  > 0 else (x-offset,y) for x, y in rule[3]],
-                    rule[0]
-                )
-            for symbol in self.normal_externals.keys():
-                self.assigned_externals[(step, symbol)] = -1
+        self.grounding_time += time() - start_time
 
-        self._ground_time += time() - t 
+        return rules
 
-    def assign_external(self, clingo_symbol, value):
-        if len(clingo_symbol.arguments) != 1:
-            print("ERROR:Clingo symbol must have one int argument!")
-            raise ValueError
-        step = int(clingo_symbol.arguments[-1].number)
-        symbol = clingo.Function(clingo_symbol.name, clingo_symbol.arguments[:-1])
-        if value is None:
-            self.assigned_externals.pop((step, symbol), None)
-        else:
-            self.assigned_externals[(step, symbol)] = 1 if value else -1
+    def ground(self, gtime):
 
-    def release_external(self, clingo_symbol):
-        if len(clingo_symbol.arguments) != 1:
-            print("ERROR:Clingo symbol must have one int argument!")
-            raise ValueError
-        step = int(clingo_symbol.arguments[-1].number)
-        symbol = clingo.Function(clingo_symbol.name, clingo_symbol.arguments[:-1])
-        self.assigned_externals.pop((step, symbol), None)
-        self.backend.add_rule(
-            [], [self.normal_externals[symbol]+(step*self.offset)], False
-        )
+        start_time = time()
 
-    def get_answer(self, model, step):
-        out = [("*",symbol) for symbol in self.output_facts]
-        for i in range(step+1):
-            for atom, symbol in self.output:
-                if model.is_true(atom+(i*self.offset)):
-                    out.append((i, symbol))
-        return out
+        if not self.has_grounded:
+            print("ERROR: grounding has not taken place yet")
+            return
 
-    def get_assumptions(self):
-        
-        return [(self.normal_externals[key[1]]+(self.offset*key[0]))*value
-                for key, value in self.assigned_externals.items()]
+        rules = {}
 
-    def cleanup(self):
-        self.control.cleanup()
+        rules[gtime] = [rule.replace(time_0, str(time - 1)).replace(time_1, str(gtime)) for rule in self.grounded_rules]
 
-    def solve(self, on_model, assumptions=[]):
-        return self.control.solve(on_model=on_model, assumptions=assumptions+self.get_assumptions())
+        self.grounding_time += time() - start_time
 
-    @property
-    def statistics(self):
-        return self.control.statistics
+        return rules
 
-    @property
-    def ground_time(self):
-        return self._init_time, self._start_time, self._ground_time
-    
-    def print_model(self, m, step):
-        print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
-                    ["{}:{}".format(x,y) for x,y in self.get_answer(m, step)]
-                )))
-    def get_model_str(self, m, step):
+    def ground_to_file(self, start, end, filename="grounded.lp"):
 
-        return " ".join(["{}:{}".format(x,y) for x,y in self.get_answer(m, step)])
+        if not self.has_grounded:
+            self.parse_prog()
+
+        with open(filename, "w") as f:
+            f.writelines(self.other_rules)
+            f.writelines([init + ".\n" for init in self.init])
+            for t, r in self.ground_range(start, end).iteritems():
+                f.writelines(r)
 
     def __str__(self):
-        out = ""
-        output_dict = {}
-        for atom, symbol in self.output:
-            output_dict[atom] = "#prev(" + symbol + ")"
-            output_dict[atom + self.offset] = symbol
-        for rule in self.rules:
-            if rule[0]:
-                out += "{"
-            out += "; ".join(
-                [output_dict.get(head, str(head)) for head in rule[1]]
-            )
-            if rule[0]:
-                out += "}"
-            if not len(rule[2]):
-                out += ".\n"
-                continue
-            if rule[1]:
-                out += " "
-            out += ":- " 
-            out += ", ".join(
-                [output_dict.get(b, str(b)) for b in rule[2] if b  > 0] +
-                ["not " + output_dict.get(
-                    -b, str(-b)
-                ) for b in rule[2] if b <= 0]
-            )
-            out += ".\n"
-        for rule in self.weight_rules:
-            if rule[0]:
-                out += "{"
-            out += "; ".join(
-                [output_dict.get(head, str(head)) for head in rule[1]]
-            )
-            if rule[0]:
-                out += "}"
-            if not len(rule[3]):
-                out += ".\n"
-                continue
-            if rule[1]:
-                out += " "
-            out += ":- {} #sum ".format(rule[2])
-            out += "{"
-            out += "; ".join(
-                [str(w) + "," + output_dict.get(b, str(b)) + ": " +
-                 output_dict.get(b,str(b)) for b,w in rule[3] if b  > 0] +
-                [str(w) + "," + output_dict.get(-b, str(-b)) + ": not " +
-                 output_dict.get(-b,str(-b)) for b,w in rule[3] if b  <= 0]
-            )
-            out += "}.\n"
-        for symbol, _ in self.primed_externals.items():
-            out += "#external {}.\n".format(str(symbol))
-        for symbol, _ in self.normal_externals.items():
-            out += "#external {}.\n".format(str(symbol))
-        for symbol in self.output_facts:
-            out += "{}.\n".format(symbol)
-        return out
+        string = ""
+        for rule in self.other_rules:
+            string += rule
+        for rule in self.grounded_rules:
+            string += rule
 
-
-class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
-
-    def __init__(self, files, program="", options=[], clingo_options=[]):
-
-        t = time()
-
-        self.mem = memory_usage_t()
-
-        # preprocessing
-        generator_class = self.get_generator_class()
-        generator = generator_class(
-            files = files,
-            adds  = [("base", [], program)],
-            parts = [("base", [])],
-            options = clingo_options,
-            compute_cautious = True,
-            compute_brave = True
-        )
-
-        # start
-        dlp_container = generator.run()
-
-        print("mem used after generating: {}MB".format(memory_usage_t() - self.mem))
-
-        # init
-        self.offset = dlp_container.offset
-        self.rules = dlp_container.rules
-        self.weight_rules = dlp_container.weight_rules
-        self.primed_externals = dlp_container.primed_externals
-        self.normal_externals = dlp_container.normal_externals
-        self.output = dlp_container.output
-        self.output_facts = dlp_container.output_facts
-        self.init = dlp_container.init
-        # rest
-        self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
-        self.steps = 0
-        self.assigned_externals = {}
-
-        self._init_time = time() - t
-        self._start_time = 0
-        self._ground_time = 0
-    
-    def get_generator_class(self):
-        return DLPGeneratorSimplifier
-
-class DynamicLogicProgramBackendSimplified_NCNB(DynamicLogicProgramBackend):
-
-    def __init__(self, files, program="", options=[], clingo_options=[]):
-
-        t = time()
-
-        # preprocessing
-        generator_class = self.get_generator_class()
-        generator = generator_class(
-            files = files,
-            adds  = [("base", [], program)],
-            parts = [("base", [])],
-            options = clingo_options,
-            compute_cautious = False,
-            compute_brave = False
-        )
-
-        # start
-        dlp_container = generator.run()
-
-
-        # init
-        self.offset = dlp_container.offset
-        self.rules = dlp_container.rules
-        self.weight_rules = dlp_container.weight_rules
-        self.primed_externals = dlp_container.primed_externals
-        self.normal_externals = dlp_container.normal_externals
-        self.output = dlp_container.output
-        self.output_facts = dlp_container.output_facts
-        self.init = dlp_container.init
-        # rest
-        self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
-        self.steps = 0
-        self.assigned_externals = {}
-
-        self._init_time = time() - t
-        self._start_time = 0
-        self._ground_time = 0
-    
-    def get_generator_class(self):
-        return DLPGeneratorSimplifier
-
-class DynamicLogicProgramBackendClingoPre(DynamicLogicProgramBackend):
-
-    def __init__(self, files, program="", options=[], clingo_options=[]):
-
-        t = time()
-
-        # preprocessing
-        generator_class = self.get_generator_class()
-        generator = generator_class(
-            files = files,
-            adds  = program,
-            options = clingo_options,
-            #compute_cautious = False,
-            #compute_brave = False
-        )
-
-        # start
-        dlp_container = generator.run()
-
-
-        # init
-        self.offset = dlp_container.offset
-        self.rules = dlp_container.rules
-        self.weight_rules = dlp_container.weight_rules
-        self.primed_externals = dlp_container.primed_externals
-        self.normal_externals = dlp_container.normal_externals
-        self.output = dlp_container.output
-        self.output_facts = dlp_container.output_facts
-        self.init = dlp_container.init
-        # rest
-        self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
-        self.steps = 0
-        self.assigned_externals = {}
-
-        self._init_time = time() - t
-        self._start_time = 0
-        self._ground_time = 0
-    
-    def get_generator_class(self):
-        return DLPGeneratorClingoPre
-
-
-def incmode():
-
-    """
-    # preprocessing
-    #generator_class = DLPGenerator
-    generator_class = DLPGeneratorSimplifier
-    generator = generator_class(
-        files = ["example.lp"],
-        #files = ["myexample.lp"],
-        # adds  = [("base", [], base)],
-        parts = [("base", [])],
-        options = sys.argv[1:],
-        #compute_cautious = False,
-        #compute_brave = False
-    )
-
-    # start
-    dlp = generator.run()
-    dlp.start()
-    #print(dlp); return
-    """
-
-    #dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
-    dlp = DynamicLogicProgramBackend(["example.lp"], clingo_options=sys.argv[1:])
-
-    #dlp = DynamicLogicProgramBackendClingoPre(["example-clingo-pre.lp"], clingo_options=sys.argv[1:])
-    dlp.start()
-    print(dlp); return
-
-    # loop
-    step, ret = 1, None
-    while True:
-        if step > 2: return
-        dlp.release_external(clingo.Function("query",[step-1]))
-        dlp.ground(1)
-        dlp.assign_external(clingo.Function("query",[step]), True)
-
-        with dlp.control.solve(assumptions=dlp.get_assumptions(), yield_ = True) as handle:
-            for m in handle:
-                print("Step: {}\n{}\nSATISFIABLE".format(step, " ".join(
-                    ["{}:{}".format(x,y) for x,y in dlp.get_answer(m, step)]
-                )))
-                return
-            print("Step: {}\nUNSATISFIABLE".format(step))
-        step += 1
-
-if __name__ == "__main__":
-    incmode()
+        return string
 
