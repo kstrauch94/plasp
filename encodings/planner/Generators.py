@@ -286,16 +286,10 @@ class SymbAtoms:
         for x, v in self.symbols.iteritems():
             yield v
 
-    def add(self, atom, is_fact, is_ext, lit):
-        # pass a string and transform it into a clingo term
+    def add_term(self, term, is_fact, is_ext, lit):
+        # pass a clingo term
         # also pass the relevant symbol information
         # add the clingo term as the key and the symbol as the value
-        try:
-            term = clingo.parse_term("".join(atom))
-        except RuntimeError as e:
-            print(atom)
-            print("ERROR parsing term {} || {}".format(atom, e))
-            raise Exception
         s = Symbol(term, is_fact, is_ext, lit)
 
         self.symbols[term] = s
@@ -348,8 +342,11 @@ class FakeControl:
         #print(self.ground_rules)
 
     def parse(self):
-        # use [1:-1] to skip the first line saying the aspif version and the last empty line
-        for line in self.ground_rules.split("\n")[1:-1]:
+        # use del to skip the first line saying the aspif version and the last empty line
+        rules = self.ground_rules.split("\n")
+        del rules[0]
+        del rules[-1]
+        for line in rules:
             line = line.split()
 
             if line[0] == "1":
@@ -364,17 +361,21 @@ class FakeControl:
     def parse_output(self, line):
 
         # curate line
-        # sometimes predicate name is too long and it splits into 2 parts separated by space -> error with .split()
+        # sometimes predicate name has a space in it and it splits into multiple parts separated by space -> error with .split()
         # here we check that the length of the string is equal to the byte count
         # if it isnt then we merge the two strings into one and create a new "line"
-        new_line = line[:2]
-        if len(line[2]) != int(line[1]):
-            new_line.append("".join(line[2:4]))
+        # repeat as needed
+
+        while len(line[2]) != int(line[1]):
+            new_line = line[:2]
+            new_line.append(" ".join(line[2:4]))
             new_line += line[4:]
             line = new_line
             
         
         is_fact = line[3] == "0"
+
+        term = clingo.parse_term(line[2])
 
         if is_fact:
             is_ext = False
@@ -384,23 +385,25 @@ class FakeControl:
             # unless we want to output facts :/
             lit = None
             
-            self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
+            self.symbolic_atoms.add_term(term, is_fact, is_ext, lit)
 
         else:
             lit = long(line[-1])
             is_ext = lit in self.external_lits
 
-            self.symbolic_atoms.add(line[2], is_fact, is_ext, lit)
+            self.symbolic_atoms.add_term(term, is_fact, is_ext, lit)
 
 
         # if the term has the name "show" then we add the arguments to the output
         # to be processed later
-        term = clingo.parse_term(line[2])
+        #term = clingo.parse_term(line[2])
         if term.name == "show":
             name = str(term.arguments[0])
             arity = int(term.arguments[1].number)
 
             self.output_atoms.append((name, arity))
+
+
 
 
     def set_output(self):
@@ -428,7 +431,7 @@ class FakeControl:
         
         # here we need to be careful because the values in the "line" are strings
         # but sometimes we need them as ints!
-    
+
         is_choice = line[1] == "1"
         head_elements = int(line[2])
         if head_elements == 0:
@@ -450,7 +453,7 @@ class FakeControl:
                 body = []
             else:
                 body = map(long, list(line[5 + head_elements:]))
-
+    
             for obs in self.observers:
                 obs.rule(is_choice, head, body)
 
@@ -466,6 +469,7 @@ class FakeControl:
 
 class DLPGeneratorClingoPre(DLPGenerator):
     # pretty much equal to DLP generator, just slightly different arguments
+    # and some small differences in the set_externals and set_output functions
 
     def __init__(self, files = [], adds = "", options = []):
         # input
@@ -564,7 +568,7 @@ class DLPGeneratorSimplifier(DLPGenerator):
         self.solve_for_output = False
         
         # maximum time that calculating cautious or brave consequences can take
-        self.time_limit = 0.1
+        self.time_limit = 0.001
 
     def simplify(self):
         self.mapping = [None]*len(self.satoms)
@@ -573,11 +577,15 @@ class DLPGeneratorSimplifier(DLPGenerator):
             self.false += self.get_consequences("brave", False)
         if self.compute_cautious:
             self.cautious += self.get_consequences("cautious", True)
+
         self.fitting()
+        print("DLP: Rules before simplifying: {}".format(len(self.rules)))
+
         if not self.compute_brave and not self.compute_cautious:
             self.solve_for_output = True
 
     def get_consequences(self, opt, true):
+        self.ctl.configuration.solve.enum_mode = opt
 
         with self.ctl.solve(yield_=True, async=True) as handle:
             time_used = 0
@@ -586,9 +594,11 @@ class DLPGeneratorSimplifier(DLPGenerator):
                 t = time()
                 try:
                     last = handle.next()
+                    print(len(last.symbols(shown=True)))
                 except StopIteration:
                     time_used += time() - t
                     break
+
                 time_used += time() - t
              
             print("DLP: Time used on {} consequences: {}".format(opt, time_used))
