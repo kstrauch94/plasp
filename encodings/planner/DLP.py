@@ -133,67 +133,6 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
 
     # ground(n) grounds n steps
     # ground(i,j) grounds from i to j (both included)
-    def ground2(self, start, end=None):
-        #########################
-        # this function is here just to test memory!!!
-        ##############################
-        mem = memory_usage_t()
-        
-        t = time()
-
-        # preprocess
-        if end == None:
-            end = self.steps + start
-            start = self.steps + 1
-        elif self.steps != start-1:
-            raise Exception(GROUNDING_ERROR)
-        self.steps = end
-        # start
-        for step in range(start, end+1):
-            mem_step = memory_usage_t()
-            adds = 0
-            offset = (step-1)*self.offset
-            i = []
-            for rule in self.rules:
-                adds += 1
-                #self.backend.add_rule(
-                #    [x+offset for x in rule[1]],
-                #    [x-offset if x <= 0 else x+offset for x in rule[2]],
-                #    rule[0]
-                #)
-
-                i.append( ( [x+offset for x in rule[1]],
-                        [x-offset if x <= 0 else x+offset for x in rule[2]],
-                        rule[0] ) ) 
-            mem_before_backend = memory_usage_t()
-            for r in i:
-                self.backend.add_rule(r[0], r[1], r[2])
-            i = []
-            mem_after_backend = memory_usage_t()
-
-            print("DLP: step {}".format(step))
-            print("DLP:mem at beggining: {}".format(mem_step))
-            print("DLP:mem after rule creation: {}".format(mem_before_backend))
-            print("DLP:mem after adding to backend: {}".format(mem_after_backend))
-
-            print("DLP: mem used after adding rules: {} MB".format(memory_usage_t() - mem_step))
-            print("DLP: adds: {}".format(adds))
-            for rule in self.weight_rules:
-                self.backend.add_weight_rule(
-                    [x+offset for x in rule[1]],
-                    rule[2],
-                    [(x+offset,y) if x  > 0 else (x-offset,y) for x, y in rule[3]],
-                    rule[0]
-                )
-            for symbol in self.normal_externals.keys():
-                self.assigned_externals[(step, symbol)] = -1
-
-            print("DLP: mem used after step: {} MB".format(memory_usage_t() - mem_step))
-
-        self._ground_time += time() - t
-
-        print("DLP: mem used grounding: {} MB".format(memory_usage_t() - mem))
-
     def ground(self, start, end=None):
         ### fuction without any memory adds
         t = time()
