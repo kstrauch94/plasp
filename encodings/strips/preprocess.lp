@@ -10,7 +10,7 @@
 
 % Check feature requirements
 
-:- requires(feature(actionCosts)).
+%:- requires(feature(actionCosts)).
 :- requires(feature(axiomRules)).
 :- requires(feature(conditionalEffects)).
 
