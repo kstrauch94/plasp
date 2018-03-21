@@ -574,7 +574,9 @@ class DLPGeneratorSimplifier(DLPGenerator):
         self.mapping = [None]*len(self.satoms)
         self.offset = len(self.satoms) - 1
         if self.compute_brave:
+            print("false before brave: {}".format(len(self.false)))
             self.false += self.get_consequences("brave", False)
+            print("false after brave: {}".format(len(self.false)))
         if self.compute_cautious:
             self.cautious += self.get_consequences("cautious", True)
 
