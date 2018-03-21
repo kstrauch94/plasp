@@ -385,6 +385,14 @@ class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
         self.steps = 0
         self.assigned_externals = {}
 
+        # set solving and restart policy
+        if 'restarts_per_solve' in options:
+            self.control.configuration.solve.solve_limit = "umax," + str(options['restarts_per_solve'])
+
+        if 'conflicts_per_restart' in options:
+            if int(options['conflicts_per_restart']) != 0:
+                self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
+
         self._init_time = time() - t
         self._start_time = 0
         self._ground_time = 0
@@ -428,6 +436,14 @@ class DynamicLogicProgramBackendSimplified_NCNB(DynamicLogicProgramBackend):
         self.steps = 0
         self.assigned_externals = {}
 
+        # set solving and restart policy
+        if 'restarts_per_solve' in options:
+            self.control.configuration.solve.solve_limit = "umax," + str(options['restarts_per_solve'])
+
+        if 'conflicts_per_restart' in options:
+            if int(options['conflicts_per_restart']) != 0:
+                self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
+
         self._init_time = time() - t
         self._start_time = 0
         self._ground_time = 0
@@ -467,6 +483,14 @@ class DynamicLogicProgramBackendClingoPre(DynamicLogicProgramBackend):
         self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
+
+        # set solving and restart policy
+        if 'restarts_per_solve' in options:
+            self.control.configuration.solve.solve_limit = "umax," + str(options['restarts_per_solve'])
+
+        if 'conflicts_per_restart' in options:
+            if int(options['conflicts_per_restart']) != 0:
+                self.control.configuration.solver[0].restarts = "F," + str(options['conflicts_per_restart'])
 
         self._init_time = time() - t
         self._start_time = 0
