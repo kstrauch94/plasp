@@ -329,7 +329,7 @@ class FakeControl:
         # clingo returns 21(or something similar) for succesful grounding
         # so it will always be an error, hence the try block
         try:
-            self.ground_rules = subprocess.check_output(["clingo"] + self.files + ["--pre"] + self.options)
+            self.ground_rules = subprocess.check_output(["clingo"] + self.files + ["--pre", "--backprop", "--eq=-1"] + self.options)
         except subprocess.CalledProcessError as e:
             # becase its always an error, grab the "error" as the output
             # which should be the aspif program
@@ -554,7 +554,7 @@ class DLPGeneratorSimplifier(DLPGenerator):
 
     def __init__(
         self, files = [], adds = [], parts = [], options = [],
-        compute_cautious=True, compute_brave=True):
+        compute_cautious=True, compute_brave=False):
         # input
         DLPGenerator.__init__(self, files, adds, parts, options)
         self.compute_cautious = compute_cautious
@@ -568,7 +568,7 @@ class DLPGeneratorSimplifier(DLPGenerator):
         self.solve_for_output = False
         
         # maximum time that calculating cautious or brave consequences can take
-        self.time_limit = 0.001
+        self.time_limit = 1
 
     def simplify(self):
         self.mapping = [None]*len(self.satoms)
@@ -579,9 +579,10 @@ class DLPGeneratorSimplifier(DLPGenerator):
             print("false after brave: {}".format(len(self.false)))
         if self.compute_cautious:
             self.cautious += self.get_consequences("cautious", True)
+            print("cautiois: ", len(self.cautious))
 
-        self.fitting()
         print("DLP: Rules before simplifying: {}".format(len(self.rules)))
+        self.fitting()
 
         if not self.compute_brave and not self.compute_cautious:
             self.solve_for_output = True
