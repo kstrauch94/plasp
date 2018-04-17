@@ -103,7 +103,6 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         self.init = dlp_container.init
         # rest
         self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
 
@@ -125,9 +124,9 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
     def start(self):
 
         t = time()
-
-        for atom in self.init:
-            self.backend.add_rule([atom], [], False)
+        with self.control.backend() as backend:
+            for atom in self.init:
+                backend.add_rule([atom], [], False)
 
         self._start_time = time() - t
 
@@ -146,27 +145,28 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         self.steps = end
         # start
         print("DLP: rules grounded: {}".format(len(self.rules)))
-        for step in range(start, end+1):
+        with self.control.backend() as backend:
+            for step in range(start, end+1):
 
-            offset = (step-1)*self.offset
+                offset = (step-1)*self.offset
 
-            for rule in self.rules:
+                for rule in self.rules:
 
-                self.backend.add_rule(
-                    [x+offset for x in rule[1]],
-                    [x-offset if x <= 0 else x+offset for x in rule[2]],
-                    rule[0]
-                )
+                    backend.add_rule(
+                        [x+offset for x in rule[1]],
+                        [x-offset if x <= 0 else x+offset for x in rule[2]],
+                        rule[0]
+                    )
 
-            for rule in self.weight_rules:
-                self.backend.add_weight_rule(
-                    [x+offset for x in rule[1]],
-                    rule[2],
-                    [(x+offset,y) if x  > 0 else (x-offset,y) for x, y in rule[3]],
-                    rule[0]
-                )
-            for symbol in self.normal_externals.keys():
-                self.assigned_externals[(step, symbol)] = -1
+                for rule in self.weight_rules:
+                    backend.add_weight_rule(
+                        [x+offset for x in rule[1]],
+                        rule[2],
+                        [(x+offset,y) if x  > 0 else (x-offset,y) for x, y in rule[3]],
+                        rule[0]
+                    )
+                for symbol in self.normal_externals.keys():
+                    self.assigned_externals[(step, symbol)] = -1
 
         self._ground_time += time() - t 
 
@@ -188,9 +188,10 @@ class DynamicLogicProgramBackend(DynamicLogicProgram):
         step = int(clingo_symbol.arguments[-1].number)
         symbol = clingo.Function(clingo_symbol.name, clingo_symbol.arguments[:-1])
         self.assigned_externals.pop((step, symbol), None)
-        self.backend.add_rule(
-            [], [self.normal_externals[symbol]+(step*self.offset)], False
-        )
+        with self.control.backend() as backend:
+            backend.add_rule(
+                [], [self.normal_externals[symbol]+(step*self.offset)], False
+            )
 
     def get_answer(self, model, step):
         out = [("*",symbol) for symbol in self.output_facts]
@@ -320,7 +321,6 @@ class DynamicLogicProgramBackendSimplified(DynamicLogicProgramBackend):
         self.init = dlp_container.init
         # rest
         self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
 
@@ -371,7 +371,6 @@ class DynamicLogicProgramBackendSimplified_NCNB(DynamicLogicProgramBackend):
         self.init = dlp_container.init
         # rest
         self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
 
@@ -419,7 +418,6 @@ class DynamicLogicProgramBackendClingoPre(DynamicLogicProgramBackend):
         self.init = dlp_container.init
         # rest
         self.control = clingo.Control(clingo_options)
-        self.backend = self.control.backend
         self.steps = 0
         self.assigned_externals = {}
 
